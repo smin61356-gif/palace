@@ -1,0 +1,725 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""生成交互版记忆宫殿分享页（单文件、无外部依赖）。"""
+import json
+import os
+import sys
+from datetime import datetime
+
+PALACE_DIR = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
+OUT = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "site", "index.html")
+
+with open(os.path.join(PALACE_DIR, "palace.json"), encoding="utf-8") as f:
+    palace = json.load(f)
+
+items = {}
+idir = os.path.join(PALACE_DIR, "items")
+for name in os.listdir(idir):
+    if name.endswith(".json"):
+        with open(os.path.join(idir, name), encoding="utf-8") as f:
+            d = json.load(f)
+        items[d["id"]] = d
+
+META = {
+    "c_df499c164c": {"author": "赫尔曼·黑塞", "publisher": "天津人民出版社", "year": 1919},
+    "c_7e8f6a2ace": {"author": "亨利·戴维·梭罗", "publisher": "中国华侨出版社", "year": 1849},
+}
+
+cells = []
+for i, cell in enumerate(palace.get("cells", [])):
+    if cell.get("kind") != "book":
+        continue
+    d = items.get(cell["id"], {})
+    chapters = [{
+        "id": ch.get("id"),
+        "title": ch.get("title", ""),
+        "sections": [{"id": s.get("id"), "title": s.get("title", ""), "done": bool(s.get("done"))}
+                     for s in ch.get("sections", [])],
+    } for ch in d.get("chapters", [])]
+    m = META.get(cell["id"], {})
+    sections = [s for ch in chapters for s in ch["sections"]]
+    cells.append({
+        "id": cell["id"],
+        "title": cell.get("title") or "未命名",
+        "author": m.get("author", ""),
+        "publisher": m.get("publisher", ""),
+        "year": m.get("year", ""),
+        "col": cell.get("col", i),
+        "row": cell.get("row", 0),
+        "chapters": chapters,
+        "sectionCount": len(sections),
+        "doneCount": sum(1 for s in sections if s["done"]),
+        "cards": d.get("cards", []),
+        "inspirations": d.get("inspirations", []),
+    })
+
+data = {"cells": cells, "now": datetime.now().strftime("%Y.%m.%d")}
+
+TEMPLATE = r"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>记忆宫殿</title>
+<meta name="description" content="一座可以拖动、可以打开的记忆宫殿：书、进度、笔记与联想。">
+<meta name="theme-color" content="#f7f3ec">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%238c3b2e'/%3E%3Cpath d='M16 6l9 7h-3v12h-12V13H7z' fill='%23f7f3ec'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --paper: #f7f3ec; --paper-2: #fffdf9;
+    --ink: #211d18; --ink-soft: #6b6255; --ink-faint: #9a9182;
+    --line: #ddd2bf; --accent: #8c3b2e; --accent-2: #c07a5e;
+    --shadow-1: 0 1px 2px rgba(70,45,20,.06), 0 10px 28px rgba(70,45,20,.07);
+    --shadow-2: 0 2px 6px rgba(70,45,20,.10), 0 28px 64px rgba(70,45,20,.18);
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #14120f; --paper-2: #1d1a15;
+      --ink: #ece4d4; --ink-soft: #a99e8b; --ink-faint: #6f6657;
+      --line: #372f25; --accent: #d98f72; --accent-2: #b3705a;
+      --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
+      --shadow-2: 0 2px 6px rgba(0,0,0,.5), 0 28px 64px rgba(0,0,0,.55);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper); color: var(--ink);
+    font-family: "Songti SC", "Noto Serif SC", "Source Han Serif SC", "STSong", Georgia, serif;
+    line-height: 1.7; min-height: 100vh; overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(900px 500px at 88% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 65%),
+      radial-gradient(700px 420px at -6% 12%, color-mix(in srgb, var(--accent-2) 7%, transparent), transparent 60%);
+  }
+  .wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 28px 40px; }
+
+  header.hero { padding: 54px 0 8px; }
+  .kicker { margin: 0 0 14px; font-size: 12px; letter-spacing: .42em; color: var(--ink-faint); text-transform: uppercase; }
+  h1 { margin: 0; font-size: clamp(38px, 6.4vw, 60px); line-height: 1.06; letter-spacing: .1em; font-weight: 600; }
+  h1 .dot { color: var(--accent); }
+  .hero-sub { margin: 14px 0 0; color: var(--ink-soft); font-size: 15px; max-width: 36em; }
+  .hero-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 22px; }
+  .btn {
+    font: inherit; font-size: 13px; letter-spacing: .08em; cursor: pointer; user-select: none;
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 16px; transition: border-color .25s, color .25s, background .25s, transform .15s;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:active { transform: scale(.97); }
+  .btn.solid { background: var(--accent); border-color: var(--accent); color: #fbf6ee; }
+  .btn.solid:hover { background: var(--accent-2); border-color: var(--accent-2); color: #fbf6ee; }
+  .stats { display: flex; gap: 34px; margin: 26px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 12px; letter-spacing: .16em; }
+  .stats b { display: block; font-size: 26px; font-weight: 600; letter-spacing: 0; color: var(--ink); }
+
+  .stage-wrap { position: relative; margin-top: 26px; }
+  .stage {
+    position: relative; height: 440px; border-radius: 20px;
+    background:
+      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 11%, transparent) 1px, transparent 1.6px) 0 0 / 26px 26px,
+      linear-gradient(180deg, color-mix(in srgb, var(--paper-2) 70%, transparent), transparent 70%);
+    border: 1px solid var(--line);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent);
+  }
+  .stage::after {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
+    background: radial-gradient(120% 90% at 50% 0%, transparent 60%, color-mix(in srgb, var(--paper) 45%, transparent));
+  }
+  #arcs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
+  .arc { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent)); stroke-dasharray: 4 10; animation: arcFlow 1.2s linear infinite; }
+  .arc-halo { fill: none; stroke: color-mix(in srgb, var(--accent) 30%, transparent); stroke-width: 10; }
+  @keyframes arcFlow { to { stroke-dashoffset: -28; } }
+
+  .hint {
+    position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 5; pointer-events: none;
+    font-size: 12px; letter-spacing: .1em; color: var(--ink-faint); white-space: nowrap;
+    background: color-mix(in srgb, var(--paper-2) 78%, transparent);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px;
+    backdrop-filter: blur(6px); transition: opacity .5s, transform .5s;
+  }
+  .hint.gone { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+
+  .cell {
+    position: absolute; z-index: 2; width: 340px; min-height: 230px;
+    display: flex; flex-direction: column; gap: 4px;
+    padding: 22px 24px 20px; border-radius: var(--radius);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--paper-2) 96%, #fff), var(--paper-2));
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-1);
+    cursor: grab; user-select: none; -webkit-user-select: none;
+    transition: box-shadow .35s, border-color .35s, transform .35s cubic-bezier(.22,.61,.36,1);
+    will-change: transform;
+    overflow: hidden;
+    --mx: 50%; --my: 30%; --rx: 0deg; --ry: 0deg;
+  }
+  .cell::before {
+    content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
+    background: radial-gradient(320px 220px at var(--mx) var(--my), color-mix(in srgb, var(--accent) 18%, transparent), transparent 62%);
+    opacity: 0; transition: opacity .4s;
+  }
+  .cell:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: var(--shadow-2); }
+  .cell.tilting { transform: perspective(700px) translate3d(0,-7px,0) rotateX(var(--rx)) rotateY(var(--ry)) scale(1.012); }
+  .cell.tilting::before { opacity: 1; }
+  .cell.dragging { cursor: grabbing; z-index: 6; transition: box-shadow .2s; transform: scale(1.03); box-shadow: var(--shadow-2); border-color: var(--accent); }
+  .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .cell-kind { display: flex; align-items: center; justify-content: space-between; }
+  .badge { font-size: 11px; letter-spacing: .28em; color: var(--accent); }
+  .cell h3 { margin: 6px 0 0; font-size: 27px; line-height: 1.25; letter-spacing: .04em; font-weight: 600; }
+  .cell .author { margin: 0; font-size: 12.5px; color: var(--ink-soft); letter-spacing: .05em; }
+  .cell-foot { margin-top: auto; padding-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; font-size: 11.5px; color: var(--ink-faint); letter-spacing: .1em; }
+  .open-hint { opacity: 0; transform: translateY(4px); transition: opacity .3s, transform .3s; color: var(--accent); }
+  .cell:hover .open-hint { opacity: 1; transform: none; }
+
+  .ring { position: relative; width: 46px; height: 46px; flex: 0 0 46px; }
+  .ring svg { transform: rotate(-90deg); display: block; }
+  .ring .track, .big-ring .track { stroke: var(--line); }
+  .ring .val, .big-ring .val { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.22,.61,.36,1); }
+  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
+
+  .reader { position: fixed; inset: 0; z-index: 50; display: none; }
+  .reader.open { display: block; }
+  .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 55%, rgba(20,15,8,.42)); backdrop-filter: blur(10px) saturate(1.1); opacity: 0; transition: opacity .4s; }
+  .reader.open .scrim { opacity: 1; }
+  .reader.closing .scrim { opacity: 0; }
+  .panel {
+    position: fixed; z-index: 2; display: flex; flex-direction: column;
+    background: var(--paper-2); border: 1px solid var(--line); border-radius: 22px;
+    box-shadow: var(--shadow-2); overflow: hidden; opacity: 0;
+  }
+  .panel.show { opacity: 1; }
+  .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 26px 30px 18px; border-bottom: 1px solid var(--line); }
+  .panel-head .badge { font-size: 11px; letter-spacing: .3em; }
+  .panel-head h2 { margin: 4px 0 0; font-size: 30px; line-height: 1.2; letter-spacing: .04em; }
+  .byline { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .close {
+    font: inherit; font-size: 22px; line-height: 1; width: 38px; height: 38px; border-radius: 50%;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer;
+    transition: border-color .25s, color .25s, transform .25s; flex: 0 0 38px;
+  }
+  .close:hover { border-color: var(--accent); color: var(--accent); transform: rotate(90deg); }
+  .close:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .panel-body { display: grid; grid-template-columns: 240px 1fr; gap: 30px; padding: 22px 30px 28px; overflow: auto; min-height: 0; }
+  .aside { display: flex; flex-direction: column; gap: 18px; }
+  .big-ring { position: relative; width: 128px; height: 128px; }
+  .big-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 24px; font-weight: 600; }
+  .aside .meta { display: grid; gap: 9px; font-size: 12.5px; color: var(--ink-soft); }
+  .aside .meta div { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
+  .aside .meta b { color: var(--ink); font-weight: 600; }
+  .aside .note { font-size: 11.5px; color: var(--ink-faint); line-height: 1.85; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+  .tab {
+    font: inherit; font-size: 13px; letter-spacing: .16em; color: var(--ink-soft);
+    background: none; border: none; padding: 10px 14px; cursor: pointer; position: relative;
+  }
+  .tab::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; background: var(--accent); transform: scaleX(0); transition: transform .3s; }
+  .tab.active { color: var(--ink); }
+  .tab.active::after { transform: scaleX(1); }
+  .tab-body { min-height: 280px; padding-top: 4px; }
+
+  .ch {
+    display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+    font: inherit; color: var(--ink); background: none; border: none;
+    padding: 12px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    cursor: pointer; border-radius: 8px; transition: background .25s, padding-left .25s;
+  }
+  .ch:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); padding-left: 16px; }
+  .ch .idx { font-size: 11px; color: var(--ink-faint); width: 26px; font-variant-numeric: tabular-nums; }
+  .ch .title { flex: 1; font-size: 15.5px; }
+  .ch .state { font-size: 11px; letter-spacing: .14em; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; transition: .3s; }
+  .ch.done .title { color: var(--ink-soft); }
+  .ch.done .state { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+  .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 36px 20px; text-align: center; color: var(--ink-soft); }
+  .empty p { margin: 0 0 4px; }
+  .empty .muted { color: var(--ink-faint); font-size: 13px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; }
+  .card blockquote { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--accent-2); color: var(--ink); }
+  .tag { font-size: 10.5px; letter-spacing: .2em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; padding: 1px 7px; }
+
+  @media (min-width: 861px) { .cell { touch-action: none; } }
+  footer.foot { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; font-size: 11.5px; letter-spacing: .12em; color: var(--ink-faint); }
+
+  @media (max-width: 860px) {
+    .wrap { padding: 0 18px 30px; }
+    header.hero { padding-top: 38px; }
+    .stage { height: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+    .stage::after, #arcs, .hint { display: none; }
+    .cell { position: static !important; width: auto !important; min-height: 0; cursor: pointer; transform: none !important; }
+    .open-hint { opacity: 1; transform: none; }
+    .panel { border-radius: 0; }
+    .panel-head { padding: 20px 18px 14px; }
+    .panel-head h2 { font-size: 24px; }
+    .panel-body { grid-template-columns: 1fr; gap: 18px; padding: 16px 18px 24px; }
+    .aside { flex-direction: row; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .big-ring { width: 92px; height: 92px; }
+    .big-ring b { font-size: 18px; }
+    .aside .note { display: none; }
+    .stats { gap: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">Memory Palace</p>
+    <h1>记忆宫殿<span class="dot">·</span></h1>
+    <p class="hero-sub">书和念头都是可以拿起来的东西——拖着它们换个位置，靠近了会亮起联想，点开就是一本书。</p>
+    <div class="hero-row">
+      <button class="btn solid" id="copy-btn">复制这个页面的链接</button>
+      <button class="btn" id="reset-btn" hidden>还原摆放</button>
+    </div>
+    <div class="stats">
+      <div><b id="stat-books">0</b><span>本书</span></div>
+      <div><b id="stat-cards">0</b><span>张卡片</span></div>
+      <div><b id="stat-inspo">0</b><span>条灵感</span></div>
+      <div><b id="stat-chapters">0</b><span>章</span></div>
+    </div>
+  </header>
+
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <div class="hint" id="hint">按住格子拖动 · 靠近会亮起联想 · 点一下打开</div>
+      <svg id="arcs" aria-hidden="true"></svg>
+    </div>
+  </div>
+
+  <footer class="foot">
+    <span>记忆宫殿 · 更新于 __NOW__</span>
+    <span>拖动与进度只保存在你这台设备</span>
+  </footer>
+</div>
+
+<div class="reader" id="reader" role="dialog" aria-modal="true" aria-label="书籍详情" aria-hidden="true">
+  <div class="scrim" id="scrim"></div>
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const KEY = "palace-share-v3";
+const state = { positions: {}, done: {}, moved: false };
+try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(state, JSON.parse(raw)); } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+const stage = document.getElementById("stage");
+const arcSvg = document.getElementById("arcs");
+const hint = document.getElementById("hint");
+const resetBtn = document.getElementById("reset-btn");
+const reader = document.getElementById("reader");
+const panel = document.getElementById("panel");
+const scrim = document.getElementById("scrim");
+
+const CW = 340, CH = 230, GAP = 470, ROW = 300;
+const narrow = () => matchMedia("(max-width: 860px)").matches;
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function metrics() {
+  const w = stage.clientWidth || 1024;
+  return w < 900 ? { cw: 300, gap: 380 } : { cw: CW, gap: GAP };
+}
+
+function basePositions() {
+  const { cw, gap } = metrics();
+  const cols = Math.max(1, ...DATA.cells.map(c => (c.col || 0) + 1));
+  const rows = Math.max(1, ...DATA.cells.map(c => (c.row || 0) + 1));
+  const sw = stage.clientWidth || 1024, sh = stage.clientHeight || 440;
+  const ox = Math.max(20, (sw - ((cols - 1) * gap + cw)) / 2);
+  const oy = Math.max(24, (sh - ((rows - 1) * ROW + CH)) / 2);
+  const map = {};
+  DATA.cells.forEach(c => { map[c.id] = { x: ox + (c.col || 0) * gap, y: oy + (c.row || 0) * ROW }; });
+  return map;
+}
+
+function doneSet(book) { return new Set(state.done[book.id] || []); }
+function doneCount(book) { const ids = doneSet(book); return book.chapters.reduce((n, ch) => n + ch.sections.filter(s => ids.has(s.id)).length, 0); }
+function pctOf(book) { return book.sectionCount ? Math.round(doneCount(book) / book.sectionCount * 100) : 0; }
+
+function ringSvg(size, p) {
+  const r = (size - 6) / 2, c = 2 * Math.PI * r;
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
+    '<circle class="track" cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke-width="2.4"/>' +
+    '<circle class="val" cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke-width="2.4" stroke-dasharray="' + c + '" stroke-dashoffset="' + (c - c * p / 100) + '"/>' +
+    '</svg>';
+}
+
+let drag = null;
+
+function render() {
+  document.querySelectorAll(".cell").forEach(n => n.remove());
+  const base = basePositions();
+  const { cw } = metrics();
+  DATA.cells.forEach((cell, i) => {
+    const el = document.createElement("article");
+    el.className = "cell";
+    el.dataset.id = cell.id;
+    el.tabIndex = 0;
+    el.setAttribute("role", "button");
+    el.setAttribute("aria-label", "打开《" + cell.title + "》");
+    el.style.width = cw + "px";
+    el.style.animation = "rise .7s cubic-bezier(.22,.61,.36,1) " + (i * 90) + "ms both";
+    const p = pctOf(cell);
+    el.innerHTML =
+      '<div class="cell-kind"><span class="badge">书</span><span class="ring">' + ringSvg(46, p) + '<b>' + p + '%</b></span></div>' +
+      '<h3>' + esc(cell.title) + '</h3>' +
+      '<p class="author">' + esc(cell.author) + '</p>' +
+      '<div class="cell-foot"><span>' + (cell.chapters.length ? cell.chapters.length + " 章 · " + cell.sectionCount + " 节" : "目录待生成") + '</span>' +
+      '<span class="open-hint">点开 →</span></div>';
+    stage.appendChild(el);
+    const clearAnim = () => { el.style.animation = "none"; };
+    el.addEventListener("animationend", clearAnim, { once: true });
+    setTimeout(clearAnim, 1500 + i * 90);
+    if (!narrow()) {
+      const q = state.positions[cell.id] || base[cell.id];
+      el.style.left = q.x + "px";
+      el.style.top = q.y + "px";
+    }
+    bindCell(el, cell);
+  });
+  document.getElementById("stat-books").textContent = DATA.cells.length;
+  document.getElementById("stat-cards").textContent = DATA.cells.reduce((n, c) => n + c.cards.length, 0);
+  document.getElementById("stat-inspo").textContent = DATA.cells.reduce((n, c) => n + c.inspirations.length, 0);
+  document.getElementById("stat-chapters").textContent = DATA.cells.reduce((n, c) => n + c.chapters.length, 0);
+  if (state.moved || Object.keys(state.positions).length) { resetBtn.hidden = false; hint.classList.add("gone"); }
+  requestAnimationFrame(drawArcs);
+}
+
+function bindCell(el, cell) {
+  el.addEventListener("pointerdown", e => {
+    if (narrow() || e.button !== 0) return;
+    const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
+    drag = {
+      el, cell, id: cell.id, pointerId: e.pointerId,
+      startX: e.clientX, startY: e.clientY,
+      origX: r.left - s.left, origY: r.top - s.top,
+      w: r.width, h: r.height, moved: false,
+    };
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    el.classList.add("dragging");
+    el.classList.remove("tilting");
+  });
+
+  el.addEventListener("pointermove", e => {
+    if (drag && drag.pointerId === e.pointerId) {
+      const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+      if (!drag.moved && Math.hypot(dx, dy) > 5) drag.moved = true;
+      if (drag.moved) {
+        const x = Math.max(0, Math.min(stage.clientWidth - drag.w, drag.origX + dx));
+        const y = Math.max(0, Math.min(stage.clientHeight - drag.h, drag.origY + dy));
+        el.style.left = x + "px";
+        el.style.top = y + "px";
+        drawArcs();
+      }
+      return;
+    }
+    if (narrow()) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    el.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
+    el.style.setProperty("--my", (py * 100).toFixed(1) + "%");
+    el.style.setProperty("--ry", ((px - .5) * 7).toFixed(2) + "deg");
+    el.style.setProperty("--rx", ((.5 - py) * 7).toFixed(2) + "deg");
+    el.classList.add("tilting");
+  });
+
+  el.addEventListener("pointerenter", () => { if (!narrow()) el.classList.add("tilting"); });
+  el.addEventListener("pointerleave", () => { el.classList.remove("tilting"); });
+
+  const finish = e => {
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    const d = drag; drag = null;
+    el.classList.remove("dragging");
+    try { el.releasePointerCapture(e.pointerId); } catch (err) {}
+    if (d.moved) {
+      const x = Math.max(0, Math.min(stage.clientWidth - d.w, d.origX + (e.clientX - d.startX)));
+      const y = Math.max(0, Math.min(stage.clientHeight - d.h, d.origY + (e.clientY - d.startY)));
+      el.style.left = x + "px"; el.style.top = y + "px";
+      state.positions[d.id] = { x, y };
+      state.moved = true;
+      save();
+      resetBtn.hidden = false;
+      hint.classList.add("gone");
+    }
+    drawArcs();
+  };
+  el.addEventListener("pointerup", e => {
+    const wasMoved = drag && drag.moved;
+    finish(e);
+    if (!wasMoved) openBook(cell.id);
+  });
+  el.addEventListener("pointercancel", finish);
+  el.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBook(cell.id); }
+  });
+}
+
+function drawArcs() {
+  if (narrow()) { arcSvg.innerHTML = ""; return; }
+  const els = [...document.querySelectorAll(".cell")];
+  if (els.length < 2) { arcSvg.innerHTML = ""; return; }
+  const sr = stage.getBoundingClientRect();
+  const rects = els.map(el => el.getBoundingClientRect());
+  let out = "";
+  for (let i = 0; i < rects.length; i++) {
+    for (let j = i + 1; j < rects.length; j++) {
+      const a = rects[i], b = rects[j];
+      const ax = a.left + a.width / 2 - sr.left, ay = a.top + a.height / 2 - sr.top;
+      const bx = b.left + b.width / 2 - sr.left, by = b.top + b.height / 2 - sr.top;
+      const dist = Math.hypot(bx - ax, by - ay);
+      if (dist > 640) continue;
+      const op = Math.max(0.18, Math.min(0.95, (640 - dist) / 260));
+      const mx = (ax + bx) / 2, my = (ay + by) / 2;
+      const nx = -(by - ay) / Math.max(dist, 1), ny = (bx - ax) / Math.max(dist, 1);
+      const sag = Math.min(70, dist * 0.16) + 10;
+      const d = "M " + ax + " " + ay + " Q " + (mx + nx * sag) + " " + (my + ny * sag) + " " + bx + " " + by;
+      out += '<path class="arc-halo" d="' + d + '" style="opacity:' + (0.3 * op) + '"/>';
+      out += '<path class="arc" d="' + d + '" style="opacity:' + op + '"/>';
+    }
+  }
+  arcSvg.innerHTML = out;
+}
+
+/* ---------- 阅读层 ---------- */
+let lastFocus = null, closing = false;
+
+function layoutPanel() {
+  const vw = innerWidth, vh = innerHeight;
+  if (narrow()) {
+    panel.style.cssText += "width:" + vw + "px;height:" + vh + "px;left:0;top:0;";
+    return { left: 0, top: 0, w: vw, h: vh };
+  }
+  const w = Math.min(1000, vw - 40), h = Math.min(700, vh - 48);
+  const left = (vw - w) / 2, top = (vh - h) / 2;
+  panel.style.cssText += "width:" + w + "px;height:" + h + "px;left:" + left + "px;top:" + top + "px;";
+  return { left, top, w, h };
+}
+
+function openBook(id) {
+  const cell = DATA.cells.find(c => c.id === id);
+  if (!cell || closing) return;
+  lastFocus = document.activeElement;
+  const cellEl = document.querySelector('.cell[data-id="' + id + '"]');
+  const startRect = cellEl ? cellEl.getBoundingClientRect() : null;
+  panel.innerHTML = panelHtml(cell);
+  panel.dataset.book = id;
+  reader.classList.add("open");
+  reader.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  const box = layoutPanel();
+  panel.classList.add("show");
+  if (startRect && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const dx = startRect.left - box.left, dy = startRect.top - box.top;
+    const sx = startRect.width / box.w, sy = startRect.height / box.h;
+    panel.animate(
+      [{ transform: "translate(" + dx + "px," + dy + "px) scale(" + sx + "," + sy + ")", opacity: .35, borderRadius: "16px" },
+       { transform: "none", opacity: 1, borderRadius: "22px" }],
+      { duration: 420, easing: "cubic-bezier(.22,.61,.36,1)" }
+    );
+  }
+  bindPanel(cell);
+  const closeBtn = panel.querySelector(".close");
+  if (closeBtn) closeBtn.focus({ preventScroll: true });
+}
+
+function closeBook() {
+  if (!reader.classList.contains("open") || closing) return;
+  closing = true;
+  const cellEl = document.querySelector('.cell[data-id="' + (panel.dataset.book || "") + '"]');
+  const endRect = cellEl ? cellEl.getBoundingClientRect() : null;
+  const pRect = panel.getBoundingClientRect();
+  reader.classList.add("closing");
+  const finish = () => {
+    closing = false;
+    reader.classList.remove("open", "closing");
+    reader.setAttribute("aria-hidden", "true");
+    panel.innerHTML = "";
+    panel.style.cssText = "";
+    document.body.style.overflow = "";
+    if (lastFocus && lastFocus.focus) setTimeout(() => lastFocus.focus({ preventScroll: true }), 20);
+  };
+  if (endRect && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    const dx = endRect.left - pRect.left, dy = endRect.top - pRect.top;
+    const sx = endRect.width / pRect.width, sy = endRect.height / pRect.height;
+    const anim = panel.animate(
+      [{ transform: "none", opacity: 1 }, { transform: "translate(" + dx + "px," + dy + "px) scale(" + sx + "," + sy + ")", opacity: 0 }],
+      { duration: 240, easing: "cubic-bezier(.4,0,.6,1)" }
+    );
+    anim.onfinish = finish;
+    anim.oncancel = finish;
+  } else {
+    setTimeout(finish, 0);
+  }
+}
+
+function panelHtml(cell) {
+  const p = pctOf(cell);
+  const year = cell.year ? " · " + cell.year : "";
+  return '' +
+    '<div class="panel-head">' +
+      '<div><span class="badge">书</span><h2>' + esc(cell.title) + '</h2>' +
+      '<p class="byline">' + esc(cell.author) + ' · ' + esc(cell.publisher) + year + '</p></div>' +
+      '<button class="close" aria-label="关闭">×</button>' +
+    '</div>' +
+    '<div class="panel-body">' +
+      '<aside class="aside">' +
+        '<div class="big-ring">' + ringSvg(128, p) + '<b data-pct>' + p + '%</b></div>' +
+        '<div class="meta">' +
+          '<div><span>目录</span><b>' + cell.chapters.length + ' 章 / ' + cell.sectionCount + ' 节</b></div>' +
+          '<div><span>已读</span><b data-done>' + doneCount(cell) + ' 节</b></div>' +
+          '<div><span>卡片</span><b>' + cell.cards.length + ' 张</b></div>' +
+          '<div><span>灵感</span><b>' + cell.inspirations.length + ' 条</b></div>' +
+        '</div>' +
+        '<p class="note">这一页只放目录和我自己的笔记，原文不在这里。<br>点章节可以标记「读过」，进度留在本机。</p>' +
+      '</aside>' +
+      '<main>' +
+        '<div class="tabs" role="tablist">' +
+          '<button class="tab active" data-tab="chapters" role="tab">目录</button>' +
+          '<button class="tab" data-tab="cards" role="tab">卡片</button>' +
+          '<button class="tab" data-tab="inspirations" role="tab">灵感</button>' +
+        '</div>' +
+        '<div class="tab-body" data-body>' + chaptersHtml(cell) + '</div>' +
+      '</main>' +
+    '</div>';
+}
+
+function chaptersHtml(cell) {
+  if (!cell.chapters.length) {
+    return '<div class="empty"><p>目录还没生成</p><p class="muted">翻开这本书之后，章节会自动出现在这里。</p></div>';
+  }
+  const ids = doneSet(cell);
+  return cell.chapters.map((ch, i) => {
+    const done = ch.sections.length > 0 && ch.sections.every(s => ids.has(s.id));
+    return '<button class="ch ' + (done ? "done" : "") + '" data-sections="' + ch.sections.map(s => s.id).join(",") + '">' +
+      '<span class="idx">' + String(i + 1).padStart(2, "0") + '</span>' +
+      '<span class="title">' + esc(ch.title) + '</span>' +
+      '<span class="state">' + (done ? "已读" : "未读") + '</span></button>';
+  }).join("");
+}
+
+function cardsHtml(cell) {
+  if (!cell.cards.length) return '<div class="empty"><p>这一本还没有卡片</p><p class="muted">划线、写下的批注会变成卡片，落在这里。</p></div>';
+  return cell.cards.map(c => {
+    const label = { excerpt: "摘录", thought: "想法", mistake: "错题" }[c.type] || "卡片";
+    return '<div class="card"><span class="tag">' + label + '</span>' +
+      (c.quote ? '<blockquote>' + esc(c.quote) + '</blockquote>' : '') +
+      (c.note ? '<p class="muted">' + esc(c.note) + '</p>' : '') + '</div>';
+  }).join("");
+}
+
+function inspoHtml(cell) {
+  if (!cell.inspirations.length) return '<div class="empty"><p>还没有灵感</p><p class="muted">聊出来的那一点火花，会留在这里。</p></div>';
+  return cell.inspirations.map(i => '<div class="card"><span class="tag">灵感</span><h4>' + esc(i.title || '') + '</h4><p class="muted">' + esc(i.body || '') + '</p></div>').join("");
+}
+
+function bindPanel(cell) {
+  panel.querySelector(".close").addEventListener("click", closeBook);
+  panel.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      panel.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
+      const body = panel.querySelector("[data-body]");
+      const kind = tab.dataset.tab;
+      body.innerHTML = kind === "cards" ? cardsHtml(cell) : kind === "inspirations" ? inspoHtml(cell) : chaptersHtml(cell);
+      if (kind === "chapters") bindChapters(cell);
+    });
+  });
+  bindChapters(cell);
+}
+
+function bindChapters(cell) {
+  panel.querySelectorAll(".ch").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const ids = doneSet(cell);
+      const secs = (btn.dataset.sections || "").split(",").filter(Boolean);
+      const nowDone = !secs.every(s => ids.has(s));
+      secs.forEach(s => nowDone ? ids.add(s) : ids.delete(s));
+      state.done[cell.id] = [...ids];
+      save();
+      btn.classList.toggle("done", nowDone);
+      btn.querySelector(".state").textContent = nowDone ? "已读" : "未读";
+      updateProgress(cell);
+    });
+  });
+}
+
+function updateProgress(cell) {
+  const p = pctOf(cell);
+  const c128 = 2 * Math.PI * ((128 - 6) / 2);
+  const big = panel.querySelector(".big-ring");
+  if (big) {
+    big.querySelector(".val").setAttribute("stroke-dashoffset", String(c128 - c128 * p / 100));
+    big.querySelector("[data-pct]").textContent = p + "%";
+  }
+  const doneEl = panel.querySelector("[data-done]");
+  if (doneEl) doneEl.textContent = doneCount(cell) + " 节";
+  const cellEl = document.querySelector('.cell[data-id="' + cell.id + '"]');
+  if (cellEl) {
+    const c46 = 2 * Math.PI * ((46 - 6) / 2);
+    cellEl.querySelector(".ring .val").setAttribute("stroke-dashoffset", String(c46 - c46 * p / 100));
+    cellEl.querySelector(".ring b").textContent = p + "%";
+  }
+}
+
+/* ---------- 全局 ---------- */
+document.getElementById("copy-btn").addEventListener("click", async e => {
+  const btn = e.currentTarget;
+  try { await navigator.clipboard.writeText(location.href); btn.textContent = "已复制"; }
+  catch (err) { window.prompt("复制这个链接：", location.href); }
+  setTimeout(() => btn.textContent = "复制这个页面的链接", 1800);
+});
+
+resetBtn.addEventListener("click", () => {
+  state.positions = {}; state.moved = false; save();
+  const base = basePositions();
+  document.querySelectorAll(".cell").forEach(el => {
+    const q = base[el.dataset.id];
+    el.style.transition = "left .4s cubic-bezier(.22,.61,.36,1), top .4s cubic-bezier(.22,.61,.36,1)";
+    el.style.left = q.x + "px";
+    el.style.top = q.y + "px";
+    setTimeout(() => { el.style.transition = ""; }, 460);
+  });
+  resetBtn.hidden = true;
+  setTimeout(drawArcs, 20);
+});
+
+scrim.addEventListener("click", closeBook);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeBook(); });
+
+let resizeTimer = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const base = basePositions();
+    const { cw } = metrics();
+    document.querySelectorAll(".cell").forEach(el => {
+      el.style.width = cw + "px";
+      if (narrow()) { el.style.left = ""; el.style.top = ""; }
+      else if (!state.positions[el.dataset.id]) {
+        const q = base[el.dataset.id];
+        el.style.left = q.x + "px";
+        el.style.top = q.y + "px";
+      }
+    });
+    drawArcs();
+  }, 120);
+});
+
+if (narrow()) hint.textContent = "点一下，翻开一本书";
+render();
+</script>
+</body>
+</html>
+"""
+
+html = TEMPLATE.replace("__NOW__", datetime.now().strftime("%Y.%m.%d")).replace("__DATA__", json.dumps(data, ensure_ascii=False))
+os.makedirs(os.path.dirname(OUT), exist_ok=True)
+with open(OUT, "w", encoding="utf-8") as f:
+    f.write(html)
+print("written", OUT, len(html), "bytes;", len(cells), "cells")
