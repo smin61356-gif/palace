@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>记忆宫殿</title>
+<meta name="description" content="一个读书人的记忆宫殿：书架、进度、卡片与灵感。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%238c3b2e'/%3E%3Cpath d='M16 6l9 7h-3v12h-12V13H7z' fill='%23f7f3ec'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --paper: #f7f3ec; --paper-2: #efe8dc; --ink: #211d18; --ink-soft: #6b6255;
+    --line: #dcd1bd; --accent: #8c3b2e; --accent-2: #b3705a; --shadow: rgba(60,40,20,.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #141310; --paper-2: #1c1a16; --ink: #eae2d3; --ink-soft: #a09786;
+      --line: #332e26; --accent: #d58f74; --accent-2: #b3705a; --shadow: rgba(0,0,0,.45);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: "Songti SC", "Noto Serif SC", "Source Han Serif SC", "STSong", Georgia, serif;
+    line-height: 1.7;
+    background-image: radial-gradient(1200px 600px at 100% -10%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%);
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px 72px; }
+  header.hero { padding: 64px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker { font-size: 13px; letter-spacing: .35em; color: var(--ink-soft); text-transform: uppercase; margin: 0 0 18px; }
+  h1 { font-size: clamp(40px, 8vw, 68px); line-height: 1.05; margin: 0; letter-spacing: .08em; font-weight: 600; }
+  h1 .dot { color: var(--accent); }
+  .hero-sub { margin: 18px 0 0; color: var(--ink-soft); font-size: 16px; max-width: 34em; }
+  .hero-actions { margin-top: 26px; display: flex; gap: 10px; flex-wrap: wrap; }
+  button.copy {
+    font: inherit; font-size: 13px; letter-spacing: .06em; cursor: pointer;
+    background: transparent; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 16px; transition: .2s;
+  }
+  button.copy:hover { border-color: var(--accent); color: var(--accent); }
+  .stats { display: flex; gap: 40px; flex-wrap: wrap; margin: 30px 0 0; padding: 22px 0 0; border-top: 1px solid var(--line); }
+  .stat b { font-size: 30px; font-weight: 600; letter-spacing: .02em; display: block; }
+  .stat span { font-size: 12px; letter-spacing: .2em; color: var(--ink-soft); }
+  section { padding-top: 56px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+  .sec-head h2 { font-size: 15px; letter-spacing: .3em; font-weight: 600; margin: 0; color: var(--accent); }
+  .sec-head .rule { flex: 1; height: 1px; background: var(--line); }
+  .sec-note { color: var(--ink-soft); font-size: 13px; margin: 0 0 28px; }
+  .book {
+    display: flex; gap: 0; background: var(--paper-2); border: 1px solid var(--line);
+    border-radius: 6px; overflow: hidden; margin-bottom: 22px; box-shadow: 0 1px 0 var(--shadow);
+  }
+  .book-spine { width: 46px; flex: 0 0 46px; border-right: 1px solid var(--line); display: flex; align-items: flex-start; justify-content: center; padding-top: 22px; color: var(--accent); font-size: 12px; letter-spacing: .2em; }
+  .book-body { flex: 1; padding: 24px 26px 22px; min-width: 0; }
+  .book-head { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; }
+  .book-title { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: .02em; line-height: 1.35; }
+  .byline { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .pct { font-size: 22px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .bar { height: 3px; background: var(--line); border-radius: 2px; margin: 20px 0 12px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); }
+  .book-meta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--ink-soft); letter-spacing: .05em; }
+  details.outline { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  details.outline summary { cursor: pointer; font-size: 13px; color: var(--ink-soft); list-style: none; }
+  details.outline summary::-webkit-details-marker { display: none; }
+  details.outline summary::before { content: "＋"; color: var(--accent); margin-right: 8px; }
+  details[open].outline summary::before { content: "－"; }
+  .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 0 2px; margin: 0; }
+  .chip { font-size: 12px; color: var(--ink-soft); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; background: var(--paper); }
+  .sub { font-size: 13px; letter-spacing: .2em; color: var(--ink-soft); margin: 26px 0 10px; }
+  .card { background: var(--paper-2); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; margin-bottom: 12px; }
+  .tag { font-size: 11px; letter-spacing: .2em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); padding: 1px 8px; border-radius: 3px; }
+  blockquote { margin: 14px 0 0; padding-left: 14px; border-left: 2px solid var(--accent-2); color: var(--ink); }
+  .fnote { margin: 10px 0 0; color: var(--ink-soft); font-size: 14px; }
+  .empty { border: 1px dashed var(--line); border-radius: 6px; padding: 34px 26px; text-align: center; }
+  .empty-title { margin: 0 0 6px; font-size: 16px; letter-spacing: .1em; }
+  footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-soft); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; letter-spacing: .08em; }
+  .muted { color: var(--ink-soft); }
+  .small { font-size: 13px; }
+  a { color: var(--accent); text-decoration: none; }
+  @media (max-width: 560px) { .wrap { padding: 0 18px 56px; } header.hero { padding: 44px 0 30px; } .book-body { padding: 20px 18px; } .book-spine { width: 34px; flex-basis: 34px; } .stats { gap: 26px; } }
+  @media (prefers-reduced-motion: no-preference) { .book { transition: transform .25s; } .book:hover { transform: translateY(-1px); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">Memory Palace</p>
+    <h1>记忆宫殿<span class="dot">·</span></h1>
+    <p class="hero-sub">书、进度、摘录与念头，都寄放在同一座宫殿里。</p>
+    <div class="hero-actions">
+      <button class="copy" id="copy" data-url="https://smin61356-gif.github.io/palace/">复制这个页面的链接</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>2</b><span>本书</span></div>
+      <div class="stat"><b>0</b><span>张卡片</span></div>
+      <div class="stat"><b>0</b><span>条灵感</span></div>
+      <div class="stat"><b>11</b><span>章</span></div>
+    </div>
+  </header>
+
+  <section id="shelf">
+    <div class="sec-head"><h2>书架</h2><div class="rule"></div></div>
+    <p class="sec-note">正在读和准备读的书。点开「目录」能看见每一章的骨架。</p>
+    
+      <article class="book" id="c_df499c164c">
+        <div class="book-spine" aria-hidden="true"><span>01</span></div>
+        <div class="book-body">
+          <div class="book-head">
+            <div>
+              <h3 class="book-title">德米安</h3>
+              <p class="byline">赫尔曼·黑塞 · 天津人民出版社 · 1919</p>
+            </div>
+            <span class="pct muted">未开始</span>
+          </div>
+          <div class="bar" role="img" aria-label="阅读进度 0%"><span style="width:0%"></span></div>
+          <div class="book-meta">
+            <span>11 章 · 11 节</span>
+            <span>0 张卡片</span>
+            <span>0 条灵感</span>
+          </div>
+          <details class="outline">
+            <summary>目录 <span class="muted">（11）</span></summary>
+            <ul class="chips"><li class="chip" title="扉页">扉页</li><li class="chip" title="前言">前言</li><li class="chip" title="两个世界">两个世界</li><li class="chip" title="该隐">该隐</li><li class="chip" title="强盗">强盗</li><li class="chip" title="贝雅特丽齐">贝雅特丽齐</li><li class="chip" title="鸟奋争出壳">鸟奋争出壳</li><li class="chip" title="雅各与天使摔跤">雅各与天使摔跤</li><li class="chip" title="夏娃夫人">夏娃夫人</li><li class="chip" title="结束与新生">结束与新生</li><li class="chip" title="译后记">译后记</li></ul>
+          </details>
+        </div>
+      </article>
+      <article class="book" id="c_7e8f6a2ace">
+        <div class="book-spine" aria-hidden="true"><span>02</span></div>
+        <div class="book-body">
+          <div class="book-head">
+            <div>
+              <h3 class="book-title">河上一周</h3>
+              <p class="byline">亨利·戴维·梭罗 · 中国华侨出版社 · 1849</p>
+            </div>
+            <span class="pct muted">未开始</span>
+          </div>
+          <div class="bar" role="img" aria-label="阅读进度 0%"><span style="width:0%"></span></div>
+          <div class="book-meta">
+            <span>目录待生成</span>
+            <span>0 张卡片</span>
+            <span>0 条灵感</span>
+          </div>
+          <details class="outline">
+            <summary>目录 <span class="muted">（—）</span></summary>
+            <p class="muted small">目录还没生成，翻开书就会自动出现。</p>
+          </details>
+        </div>
+      </article>
+  </section>
+
+  <section id="cards">
+    <div class="sec-head"><h2>卡片</h2><div class="rule"></div></div>
+    <p class="sec-note">划下的句子和写下的批注。</p>
+    
+      <div class="empty">
+        <p class="empty-title">宫殿还在建造中</p>
+        <p class="muted">在书里划线、写下的想法，会变成一张张卡片落在这里。</p>
+      </div>
+  </section>
+
+  <section id="inspirations">
+    <div class="sec-head"><h2>灵感</h2><div class="rule"></div></div>
+    <p class="sec-note">读完、聊完之后留下来的东西。</p>
+    
+      <div class="empty">
+        <p class="empty-title">还没有灵感</p>
+        <p class="muted">聊出来的那一点火花，会留在这里。</p>
+      </div>
+  </section>
+
+  <footer>
+    <span>记忆宫殿 · 更新于 2026.11.26</span>
+    <span>由 DSH 记忆宫殿生成</span>
+  </footer>
+</div>
+<script>
+  const btn = document.getElementById('copy');
+  btn.addEventListener('click', async () => {
+    const text = btn.dataset.url || location.href;
+    try { await navigator.clipboard.writeText(text); btn.textContent = '已复制，去发给他吧'; }
+    catch (e) { window.prompt('复制这个链接：', text); }
+    setTimeout(() => btn.textContent = '复制这个页面的链接', 2200);
+  });
+</script>
+</body>
+</html>
