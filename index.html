@@ -3,659 +3,666 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>记忆宫殿</title>
-<meta name="description" content="一座可以拖动、可以打开的记忆宫殿：书、进度、笔记与联想。">
-<meta name="theme-color" content="#f7f3ec">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%238c3b2e'/%3E%3Cpath d='M16 6l9 7h-3v12h-12V13H7z' fill='%23f7f3ec'/%3E%3C/svg%3E">
+<title>记忆宫殿 · Memory Palace</title>
+<meta name="description" content="一座建在星图上的记忆宫殿：每本书是一颗星，联想把它们连起来。">
+<meta name="theme-color" content="#7ea7c4">
+<script>
+  try {
+    var saved = localStorage.getItem("palace-theme");
+  } catch (e) {}
+</script>
 <style>
   :root {
-    --paper: #f7f3ec; --paper-2: #fffdf9;
-    --ink: #211d18; --ink-soft: #6b6255; --ink-faint: #9a9182;
-    --line: #ddd2bf; --accent: #8c3b2e; --accent-2: #c07a5e;
-    --shadow-1: 0 1px 2px rgba(70,45,20,.06), 0 10px 28px rgba(70,45,20,.07);
-    --shadow-2: 0 2px 6px rgba(70,45,20,.10), 0 28px 64px rgba(70,45,20,.18);
-    --radius: 16px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper: #14120f; --paper-2: #1d1a15;
-      --ink: #ece4d4; --ink-soft: #a99e8b; --ink-faint: #6f6657;
-      --line: #372f25; --accent: #d98f72; --accent-2: #b3705a;
-      --shadow-1: 0 1px 2px rgba(0,0,0,.4), 0 10px 28px rgba(0,0,0,.35);
-      --shadow-2: 0 2px 6px rgba(0,0,0,.5), 0 28px 64px rgba(0,0,0,.55);
-    }
+    --ink: #17262f; --ink-soft: #3c5567; --line: rgba(23,38,47,.16);
+    --paper: #f7f4ec; --accent: #8c3b2e;
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
   body {
-    background: var(--paper); color: var(--ink);
+    animation: fadein .9s ease both;
+    background: #7ea7c4; color: var(--ink);
     font-family: "Songti SC", "Noto Serif SC", "Source Han Serif SC", "STSong", Georgia, serif;
-    line-height: 1.7; min-height: 100vh; overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
   }
-  body::before {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-    background:
-      radial-gradient(900px 500px at 88% -8%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 65%),
-      radial-gradient(700px 420px at -6% 12%, color-mix(in srgb, var(--accent-2) 7%, transparent), transparent 60%);
-  }
-  .wrap { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 0 28px 40px; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+  canvas.dragging { cursor: grabbing; }
+  canvas.linkmode { cursor: crosshair; }
 
-  header.hero { padding: 54px 0 8px; }
-  .kicker { margin: 0 0 14px; font-size: 12px; letter-spacing: .42em; color: var(--ink-faint); text-transform: uppercase; }
-  h1 { margin: 0; font-size: clamp(38px, 6.4vw, 60px); line-height: 1.06; letter-spacing: .1em; font-weight: 600; }
-  h1 .dot { color: var(--accent); }
-  .hero-sub { margin: 14px 0 0; color: var(--ink-soft); font-size: 15px; max-width: 36em; }
-  .hero-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 22px; }
-  .btn {
-    font: inherit; font-size: 13px; letter-spacing: .08em; cursor: pointer; user-select: none;
-    background: transparent; color: var(--ink); border: 1px solid var(--line);
-    border-radius: 999px; padding: 8px 16px; transition: border-color .25s, color .25s, background .25s, transform .15s;
-  }
-  .btn:hover { border-color: var(--accent); color: var(--accent); }
-  .btn:active { transform: scale(.97); }
-  .btn.solid { background: var(--accent); border-color: var(--accent); color: #fbf6ee; }
-  .btn.solid:hover { background: var(--accent-2); border-color: var(--accent-2); color: #fbf6ee; }
-  .stats { display: flex; gap: 34px; margin: 26px 0 0; padding: 18px 0 0; border-top: 1px solid var(--line); color: var(--ink-faint); font-size: 12px; letter-spacing: .16em; }
-  .stats b { display: block; font-size: 26px; font-weight: 600; letter-spacing: 0; color: var(--ink); }
+  .brand { position: fixed; z-index: 5; left: 34px; top: 26px; pointer-events: none; color: #102028; }
+  .brand h1 { margin: 0; font-size: 27px; font-weight: 500; letter-spacing: .02em; text-shadow: 0 1px 0 rgba(255,255,255,.35); }
+  .brand p { margin: 4px 0 0; font-size: 11.5px; letter-spacing: .22em; color: rgba(16,32,40,.62); text-transform: uppercase; }
 
-  .stage-wrap { position: relative; margin-top: 26px; }
-  .stage {
-    position: relative; height: 440px; border-radius: 20px;
-    background:
-      radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--ink) 11%, transparent) 1px, transparent 1.6px) 0 0 / 26px 26px,
-      linear-gradient(180deg, color-mix(in srgb, var(--paper-2) 70%, transparent), transparent 70%);
-    border: 1px solid var(--line);
-    box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent);
+  .toolbar { position: fixed; z-index: 6; right: 26px; top: 24px; display: flex; gap: 8px; }
+  .tool {
+    font: inherit; font-size: 12px; letter-spacing: .08em; cursor: pointer;
+    color: #16303c; background: rgba(247,244,236,.55); border: 1px solid rgba(23,38,47,.22);
+    border-radius: 999px; padding: 7px 14px; backdrop-filter: blur(8px);
+    transition: background .25s, border-color .25s, color .25s, transform .15s;
   }
-  .stage::after {
-    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 4;
-    background: radial-gradient(120% 90% at 50% 0%, transparent 60%, color-mix(in srgb, var(--paper) 45%, transparent));
-  }
-  #arcs { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; overflow: visible; }
-  .arc { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 55%, transparent)); stroke-dasharray: 4 10; animation: arcFlow 1.2s linear infinite; }
-  .arc-halo { fill: none; stroke: color-mix(in srgb, var(--accent) 30%, transparent); stroke-width: 10; }
-  @keyframes arcFlow { to { stroke-dashoffset: -28; } }
+  .tool:hover { background: rgba(247,244,236,.85); border-color: rgba(23,38,47,.4); }
+  .tool:active { transform: scale(.97); }
+  .tool.on { background: rgba(140,59,46,.9); border-color: rgba(140,59,46,.9); color: #fbf6ee; }
 
-  .hint {
-    position: absolute; left: 50%; top: 14px; transform: translateX(-50%); z-index: 5; pointer-events: none;
-    font-size: 12px; letter-spacing: .1em; color: var(--ink-faint); white-space: nowrap;
-    background: color-mix(in srgb, var(--paper-2) 78%, transparent);
-    border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px;
-    backdrop-filter: blur(6px); transition: opacity .5s, transform .5s;
+  .hintbar {
+    position: fixed; z-index: 5; left: 34px; bottom: 22px;
+    font-size: 12px; letter-spacing: .12em; color: rgba(16,32,40,.66);
+    background: rgba(247,244,236,.5); border: 1px solid rgba(23,38,47,.14);
+    border-radius: 999px; padding: 6px 16px; backdrop-filter: blur(8px); white-space: nowrap;
+    transition: opacity .4s;
   }
-  .hint.gone { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  .hintbar.hidden { opacity: 0; }
 
-  .cell {
-    position: absolute; z-index: 2; width: 340px; min-height: 230px;
-    display: flex; flex-direction: column; gap: 4px;
-    padding: 22px 24px 20px; border-radius: var(--radius);
-    background: linear-gradient(160deg, color-mix(in srgb, var(--paper-2) 96%, #fff), var(--paper-2));
-    border: 1px solid var(--line);
-    box-shadow: var(--shadow-1);
-    cursor: grab; user-select: none; -webkit-user-select: none;
-    transition: box-shadow .35s, border-color .35s, transform .35s cubic-bezier(.22,.61,.36,1);
-    will-change: transform;
-    overflow: hidden;
-    --mx: 50%; --my: 30%; --rx: 0deg; --ry: 0deg;
+  .tip {
+    position: fixed; z-index: 7; pointer-events: none; padding: 7px 11px;
+    background: rgba(20,34,42,.9); color: #f3eee2; border-radius: 8px;
+    font-size: 12px; letter-spacing: .06em; opacity: 0; transform: translate(-50%, -130%) scale(.96);
+    transition: opacity .18s, transform .18s; max-width: 240px; text-align: center; line-height: 1.5;
   }
-  .cell::before {
-    content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none;
-    background: radial-gradient(320px 220px at var(--mx) var(--my), color-mix(in srgb, var(--accent) 18%, transparent), transparent 62%);
-    opacity: 0; transition: opacity .4s;
-  }
-  .cell:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: var(--shadow-2); }
-  .cell.tilting { transform: perspective(700px) translate3d(0,-7px,0) rotateX(var(--rx)) rotateY(var(--ry)) scale(1.012); }
-  .cell.tilting::before { opacity: 1; }
-  .cell.dragging { cursor: grabbing; z-index: 6; transition: box-shadow .2s; transform: scale(1.03); box-shadow: var(--shadow-2); border-color: var(--accent); }
-  .cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  .cell-kind { display: flex; align-items: center; justify-content: space-between; }
-  .badge { font-size: 11px; letter-spacing: .28em; color: var(--accent); }
-  .cell h3 { margin: 6px 0 0; font-size: 27px; line-height: 1.25; letter-spacing: .04em; font-weight: 600; }
-  .cell .author { margin: 0; font-size: 12.5px; color: var(--ink-soft); letter-spacing: .05em; }
-  .cell-foot { margin-top: auto; padding-top: 14px; display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; font-size: 11.5px; color: var(--ink-faint); letter-spacing: .1em; }
-  .open-hint { opacity: 0; transform: translateY(4px); transition: opacity .3s, transform .3s; color: var(--accent); }
-  .cell:hover .open-hint { opacity: 1; transform: none; }
+  .tip.show { opacity: 1; transform: translate(-50%, -140%) scale(1); }
 
-  .ring { position: relative; width: 46px; height: 46px; flex: 0 0 46px; }
-  .ring svg { transform: rotate(-90deg); display: block; }
-  .ring .track, .big-ring .track { stroke: var(--line); }
-  .ring .val, .big-ring .val { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.22,.61,.36,1); }
-  .ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--ink-soft); }
-
-  .reader { position: fixed; inset: 0; z-index: 50; display: none; }
-  .reader.open { display: block; }
-  .scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--paper) 55%, rgba(20,15,8,.42)); backdrop-filter: blur(10px) saturate(1.1); opacity: 0; transition: opacity .4s; }
-  .reader.open .scrim { opacity: 1; }
-  .reader.closing .scrim { opacity: 0; }
   .panel {
-    position: fixed; z-index: 2; display: flex; flex-direction: column;
-    background: var(--paper-2); border: 1px solid var(--line); border-radius: 22px;
-    box-shadow: var(--shadow-2); overflow: hidden; opacity: 0;
+    position: fixed; z-index: 8; top: 24px; right: 24px; bottom: 24px; width: 372px;
+    display: flex; flex-direction: column;
+    background: rgba(248,245,237,.94); border: 1px solid rgba(23,38,47,.18); border-radius: 20px;
+    box-shadow: 0 30px 80px rgba(10,26,36,.35); backdrop-filter: blur(14px) saturate(1.1);
+    transform: translateX(calc(100% + 40px)); transition: transform .45s cubic-bezier(.22,.61,.36,1);
+    overflow: hidden;
   }
-  .panel.show { opacity: 1; }
-  .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 26px 30px 18px; border-bottom: 1px solid var(--line); }
-  .panel-head .badge { font-size: 11px; letter-spacing: .3em; }
-  .panel-head h2 { margin: 4px 0 0; font-size: 30px; line-height: 1.2; letter-spacing: .04em; }
-  .byline { margin: 6px 0 0; font-size: 13px; color: var(--ink-soft); }
-  .close {
-    font: inherit; font-size: 22px; line-height: 1; width: 38px; height: 38px; border-radius: 50%;
-    border: 1px solid var(--line); background: transparent; color: var(--ink-soft); cursor: pointer;
-    transition: border-color .25s, color .25s, transform .25s; flex: 0 0 38px;
+  .panel.open { transform: none; }
+  .panel-head { padding: 26px 26px 16px; border-bottom: 1px solid var(--line); position: relative; }
+  .panel-head .kind { font-size: 10.5px; letter-spacing: .3em; color: var(--accent); }
+  .panel-head h2 { margin: 8px 0 0; font-size: 32px; line-height: 1.18; letter-spacing: .02em; font-weight: 600; }
+  .panel-head .by { margin: 8px 0 0; font-size: 13px; color: var(--ink-soft); }
+  .panel-close {
+    position: absolute; right: 18px; top: 18px; width: 34px; height: 34px; border-radius: 50%;
+    border: 1px solid var(--line); background: transparent; color: var(--ink-soft);
+    font: inherit; font-size: 20px; line-height: 1; cursor: pointer; transition: .25s;
   }
-  .close:hover { border-color: var(--accent); color: var(--accent); transform: rotate(90deg); }
-  .close:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  .panel-body { display: grid; grid-template-columns: 240px 1fr; gap: 30px; padding: 22px 30px 28px; overflow: auto; min-height: 0; }
-  .aside { display: flex; flex-direction: column; gap: 18px; }
-  .big-ring { position: relative; width: 128px; height: 128px; }
-  .big-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 24px; font-weight: 600; }
-  .aside .meta { display: grid; gap: 9px; font-size: 12.5px; color: var(--ink-soft); }
-  .aside .meta div { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--line); padding-bottom: 6px; }
-  .aside .meta b { color: var(--ink); font-weight: 600; }
-  .aside .note { font-size: 11.5px; color: var(--ink-faint); line-height: 1.85; }
-
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
-  .tab {
-    font: inherit; font-size: 13px; letter-spacing: .16em; color: var(--ink-soft);
-    background: none; border: none; padding: 10px 14px; cursor: pointer; position: relative;
+  .panel-close:hover { color: var(--accent); border-color: rgba(140,59,46,.5); transform: rotate(90deg); }
+  .panel-body { padding: 18px 26px 30px; overflow: auto; }
+  .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .fact { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .fact b { display: block; font-size: 19px; font-weight: 600; letter-spacing: .01em; }
+  .fact span { font-size: 10.5px; letter-spacing: .16em; color: rgba(23,38,47,.55); }
+  .panel h3 { font-size: 11px; letter-spacing: .24em; color: rgba(23,38,47,.5); font-weight: 500; margin: 20px 0 10px; }
+  .chapter { display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid rgba(23,38,47,.08); font-size: 14.5px; }
+  .chapter .n { color: rgba(23,38,47,.35); font-size: 11px; width: 22px; padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .muted { color: rgba(23,38,47,.5); font-size: 12.5px; line-height: 1.8; }
+  .links { display: grid; gap: 8px; }
+  .linkrow { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .linkrow i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+  .clearlinks {
+    margin-top: 12px; font: inherit; font-size: 11.5px; letter-spacing: .08em; cursor: pointer;
+    background: none; border: 1px dashed var(--line); border-radius: 8px; color: rgba(23,38,47,.55);
+    padding: 6px 10px;
   }
-  .tab::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -1px; height: 2px; background: var(--accent); transform: scaleX(0); transition: transform .3s; }
-  .tab.active { color: var(--ink); }
-  .tab.active::after { transform: scaleX(1); }
-  .tab-body { min-height: 280px; padding-top: 4px; }
+  .clearlinks:hover { color: var(--accent); border-color: rgba(140,59,46,.4); }
+  .panel-foot { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11px; letter-spacing: .1em; color: rgba(23,38,47,.45); }
 
-  .ch {
-    display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
-    font: inherit; color: var(--ink); background: none; border: none;
-    padding: 12px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
-    cursor: pointer; border-radius: 8px; transition: background .25s, padding-left .25s;
+  .toast {
+    position: fixed; z-index: 9; left: 50%; bottom: 70px; transform: translate(-50%, 10px);
+    background: rgba(20,34,42,.92); color: #f3eee2; padding: 9px 16px; border-radius: 999px;
+    font-size: 12.5px; letter-spacing: .08em; opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none;
   }
-  .ch:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); padding-left: 16px; }
-  .ch .idx { font-size: 11px; color: var(--ink-faint); width: 26px; font-variant-numeric: tabular-nums; }
-  .ch .title { flex: 1; font-size: 15.5px; }
-  .ch .state { font-size: 11px; letter-spacing: .14em; color: var(--ink-faint); border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; transition: .3s; }
-  .ch.done .title { color: var(--ink-soft); }
-  .ch.done .state { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-  .empty { border: 1px dashed var(--line); border-radius: 14px; padding: 36px 20px; text-align: center; color: var(--ink-soft); }
-  .empty p { margin: 0 0 4px; }
-  .empty .muted { color: var(--ink-faint); font-size: 13px; }
-  .card { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 12px; }
-  .card blockquote { margin: 10px 0 0; padding-left: 12px; border-left: 2px solid var(--accent-2); color: var(--ink); }
-  .tag { font-size: 10.5px; letter-spacing: .2em; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; padding: 1px 7px; }
-
-  @media (min-width: 861px) { .cell { touch-action: none; } }
-  footer.foot { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; font-size: 11.5px; letter-spacing: .12em; color: var(--ink-faint); }
-
-  @media (max-width: 860px) {
-    .wrap { padding: 0 18px 30px; }
-    header.hero { padding-top: 38px; }
-    .stage { height: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px; }
-    .stage::after, #arcs, .hint { display: none; }
-    .cell { position: static !important; width: auto !important; min-height: 0; cursor: pointer; transform: none !important; }
-    .open-hint { opacity: 1; transform: none; }
-    .panel { border-radius: 0; }
-    .panel-head { padding: 20px 18px 14px; }
-    .panel-head h2 { font-size: 24px; }
-    .panel-body { grid-template-columns: 1fr; gap: 18px; padding: 16px 18px 24px; }
-    .aside { flex-direction: row; align-items: center; gap: 18px; flex-wrap: wrap; }
-    .big-ring { width: 92px; height: 92px; }
-    .big-ring b { font-size: 18px; }
-    .aside .note { display: none; }
-    .stats { gap: 24px; }
+  @media (max-width: 720px) {
+    .brand { left: 18px; top: 16px; }
+    .brand h1 { font-size: 21px; }
+    .brand p { font-size: 10px; letter-spacing: .18em; }
+    .toolbar { right: 14px; top: 14px; gap: 6px; }
+    .tool { font-size: 11px; padding: 6px 10px; }
+    .tool.reset-label { display: none; }
+    .hintbar { font-size: 11px; bottom: 14px; left: 18px; }
+    .panel { left: 0; right: 0; top: auto; bottom: 0; width: auto; height: 68vh; border-radius: 20px 20px 0 0; transform: translateY(105%); }
+    .panel.open { transform: none; }
+    .panel-head h2 { font-size: 26px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+    * { transition-duration: .001ms !important; animation-duration: .001ms !important; }
   }
-  @keyframes rise { from { opacity: 0; transform: translateY(16px) scale(.98); } to { opacity: 1; transform: none; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="hero">
-    <p class="kicker">Memory Palace</p>
-    <h1>记忆宫殿<span class="dot">·</span></h1>
-    <p class="hero-sub">书和念头都是可以拿起来的东西——拖着它们换个位置，靠近了会亮起联想，点开就是一本书。</p>
-    <div class="hero-row">
-      <button class="btn solid" id="copy-btn">复制这个页面的链接</button>
-      <button class="btn" id="reset-btn" hidden>还原摆放</button>
-    </div>
-    <div class="stats">
-      <div><b id="stat-books">0</b><span>本书</span></div>
-      <div><b id="stat-cards">0</b><span>张卡片</span></div>
-      <div><b id="stat-inspo">0</b><span>条灵感</span></div>
-      <div><b id="stat-chapters">0</b><span>章</span></div>
-    </div>
-  </header>
+<canvas id="scene"></canvas>
 
-  <div class="stage-wrap">
-    <div class="stage" id="stage">
-      <div class="hint" id="hint">按住格子拖动 · 靠近会亮起联想 · 点一下打开</div>
-      <svg id="arcs" aria-hidden="true"></svg>
-    </div>
+<div class="brand">
+  <h1>Memory Palace</h1>
+  <p>记忆宫殿 · 5 本书</p>
+</div>
+
+<div class="toolbar">
+  <button class="tool on" id="spinBtn">自动旋转</button>
+  <button class="tool" id="linkBtn">连一条联想</button>
+  <button class="tool" id="resetBtn">重置视角</button>
+</div>
+
+<div class="hintbar" id="hintbar">拖动旋转 · 滚轮缩放 · 点星球打开</div>
+<div class="tip" id="tip"></div>
+<div class="toast" id="toast"></div>
+
+<aside class="panel" id="panel" aria-hidden="true">
+  <div class="panel-head">
+    <span class="kind">书</span>
+    <h2 id="p-title"></h2>
+    <p class="by" id="p-by"></p>
+    <button class="panel-close" id="panelClose" aria-label="关闭">×</button>
   </div>
-
-  <footer class="foot">
-    <span>记忆宫殿 · 更新于 2026.11.26</span>
-    <span>拖动与进度只保存在你这台设备</span>
-  </footer>
-</div>
-
-<div class="reader" id="reader" role="dialog" aria-modal="true" aria-label="书籍详情" aria-hidden="true">
-  <div class="scrim" id="scrim"></div>
-  <div class="panel" id="panel"></div>
-</div>
+  <div class="panel-body" id="panelBody"></div>
+</aside>
 
 <script>
-const DATA = {"cells": [{"id": "c_df499c164c", "title": "德米安", "author": "赫尔曼·黑塞", "publisher": "天津人民出版社", "year": 1919, "col": 0, "row": 0, "chapters": [{"id": "ch_2ba9105f13", "title": "扉页", "sections": [{"id": "s_00f8da1ae2", "title": "扉页", "done": false}]}, {"id": "ch_f25a691bd9", "title": "前言", "sections": [{"id": "s_f7fa2ef20c", "title": "前言", "done": false}]}, {"id": "ch_db203b39c5", "title": "两个世界", "sections": [{"id": "s_146b4b0901", "title": "两个世界", "done": false}]}, {"id": "ch_1ce30c3837", "title": "该隐", "sections": [{"id": "s_6cce62bebb", "title": "该隐", "done": false}]}, {"id": "ch_01bcd5acd5", "title": "强盗", "sections": [{"id": "s_08f9570208", "title": "强盗", "done": false}]}, {"id": "ch_351b65a3c0", "title": "贝雅特丽齐", "sections": [{"id": "s_8f664734f3", "title": "贝雅特丽齐", "done": false}]}, {"id": "ch_1032a69761", "title": "鸟奋争出壳", "sections": [{"id": "s_bb6ff109e5", "title": "鸟奋争出壳", "done": false}]}, {"id": "ch_696b621811", "title": "雅各与天使摔跤", "sections": [{"id": "s_5c1e82ea6c", "title": "雅各与天使摔跤", "done": false}]}, {"id": "ch_f054d74197", "title": "夏娃夫人", "sections": [{"id": "s_b3f0615a37", "title": "夏娃夫人", "done": false}]}, {"id": "ch_d6e9fbf9c0", "title": "结束与新生", "sections": [{"id": "s_0fa6fce66a", "title": "结束与新生", "done": false}]}, {"id": "ch_7d7b47d962", "title": "译后记", "sections": [{"id": "s_ddb86841db", "title": "译后记", "done": false}]}], "sectionCount": 11, "doneCount": 0, "cards": [], "inspirations": []}, {"id": "c_7e8f6a2ace", "title": "河上一周", "author": "亨利·戴维·梭罗", "publisher": "中国华侨出版社", "year": 1849, "col": 1, "row": 0, "chapters": [], "sectionCount": 0, "doneCount": 0, "cards": [], "inspirations": []}], "now": "2026.11.26"};
-const KEY = "palace-share-v3";
-const state = { positions: {}, done: {}, moved: false };
-try { const raw = localStorage.getItem(KEY); if (raw) Object.assign(state, JSON.parse(raw)); } catch (e) {}
-function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+const DATA = {"books": [{"id": "c_df499c164c", "title": "德米安", "author": "赫尔曼·黑塞", "publisher": "天津人民出版社", "year": "1919", "color": "#d9a24c", "pos": [-18, -18], "chapters": [{"title": "扉页", "sections": ["扉页"]}, {"title": "前言", "sections": ["前言"]}, {"title": "两个世界", "sections": ["两个世界"]}, {"title": "该隐", "sections": ["该隐"]}, {"title": "强盗", "sections": ["强盗"]}, {"title": "贝雅特丽齐", "sections": ["贝雅特丽齐"]}, {"title": "鸟奋争出壳", "sections": ["鸟奋争出壳"]}, {"title": "雅各与天使摔跤", "sections": ["雅各与天使摔跤"]}, {"title": "夏娃夫人", "sections": ["夏娃夫人"]}, {"title": "结束与新生", "sections": ["结束与新生"]}, {"title": "译后记", "sections": ["译后记"]}], "sectionCount": 11, "cards": [], "inspirations": []}, {"id": "c_7e8f6a2ace", "title": "河上一周", "author": "亨利·戴维·梭罗", "publisher": "中国华侨出版社", "year": "1849", "color": "#8fb9cf", "pos": [-317, 370], "chapters": [], "sectionCount": 0, "cards": [], "inspirations": []}, {"id": "c_1ee75e7cd6", "title": "在轮下", "author": "赫尔曼·黑塞", "publisher": "天津人民出版社", "year": "1906", "color": "#a7bd8b", "pos": [440, 106], "chapters": [], "sectionCount": 0, "cards": [], "inspirations": []}, {"id": "c_5e35f97e1b", "title": "黑塞童话", "author": "赫尔曼·黑塞", "publisher": "天津人民出版社", "year": "1919", "color": "#e2b492", "pos": [229, -352], "chapters": [], "sectionCount": 0, "cards": [], "inspirations": []}, {"id": "c_e8d16f5ee4", "title": "永别了，武器", "author": "厄尼斯特·海明威", "publisher": "天津人民出版社", "year": "1929", "color": "#c96b5c", "pos": [-370, -106], "chapters": [], "sectionCount": 0, "cards": [], "inspirations": []}], "now": "2026.11.26"};
 
-const stage = document.getElementById("stage");
-const arcSvg = document.getElementById("arcs");
-const hint = document.getElementById("hint");
-const resetBtn = document.getElementById("reset-btn");
-const reader = document.getElementById("reader");
+/* ---------------- 场景参数 ---------------- */
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+const tip = document.getElementById("tip");
+const toast = document.getElementById("toast");
+const hintbar = document.getElementById("hintbar");
 const panel = document.getElementById("panel");
-const scrim = document.getElementById("scrim");
 
-const CW = 340, CH = 230, GAP = 470, ROW = 300;
-const narrow = () => matchMedia("(max-width: 860px)").matches;
-const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+let W = innerWidth, H = innerHeight, DPR = 1;
 
-function metrics() {
-  const w = stage.clientWidth || 1024;
-  return w < 900 ? { cw: 300, gap: 380 } : { cw: CW, gap: GAP };
+const fitDist = () => innerWidth < 720 ? 2750 : (innerWidth < 1100 ? 2350 : 1850);
+const view = {
+  yaw: 0.42, pitch: 1.0, dist: fitDist(),
+  targetDist: fitDist(), targetPitch: 1.0,
+  panX: 0, panY: 0,
+  spin: !matchMedia('(prefers-reduced-motion: reduce)').matches, vYaw: 0, idle: 0,
+};
+
+const GRID = 120, EXT = 9;
+const COLORS = {};
+DATA.books.forEach(b => COLORS[b.id] = hexToRgb(b.color));
+
+/* ---------------- 工具 ---------------- */
+function hexToRgb(h) {
+  const v = h.replace("#", "");
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+}
+function mix(c, target, amount) {
+  const t = target === "#fff" ? [255, 255, 255] : [12, 20, 26];
+  return c.map((v, i) => Math.round(v + (t[i] - v) * amount));
+}
+const rgba = (c, a) => "rgba(" + c[0] + "," + c[1] + "," + c[2] + "," + a + ")";
+
+function project(x, y, z) {
+  const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw);
+  const X = x * cy - z * sy;
+  const Z = x * sy + z * cy;
+  const cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+  const Y = y * cp + Z * sp;
+  const Zc = Z * cp - y * sp;
+  const d = Zc + view.dist;
+  const s = 1500 / Math.max(d, 80);
+  return { x: W / 2 + X * s + view.panX, y: H * 0.56 - Y * s + view.panY, s, d };
 }
 
-function basePositions() {
-  const { cw, gap } = metrics();
-  const cols = Math.max(1, ...DATA.cells.map(c => (c.col || 0) + 1));
-  const rows = Math.max(1, ...DATA.cells.map(c => (c.row || 0) + 1));
-  const sw = stage.clientWidth || 1024, sh = stage.clientHeight || 440;
-  const ox = Math.max(20, (sw - ((cols - 1) * gap + cw)) / 2);
-  const oy = Math.max(24, (sh - ((rows - 1) * ROW + CH)) / 2);
-  const map = {};
-  DATA.cells.forEach(c => { map[c.id] = { x: ox + (c.col || 0) * gap, y: oy + (c.row || 0) * ROW }; });
-  return map;
-}
+/* ---------------- 书本星球 ---------------- */
+const nodes = DATA.books.map((b, i) => ({
+  book: b,
+  x: b.pos[0], z: b.pos[1], baseY: 74,
+  r: (40 + (b.title.length > 3 ? 2 : 0)) * (innerWidth < 720 ? 1.35 : 1),
+  phase: i * 1.7,
+  color: COLORS[b.id],
+}));
 
-function doneSet(book) { return new Set(state.done[book.id] || []); }
-function doneCount(book) { const ids = doneSet(book); return book.chapters.reduce((n, ch) => n + ch.sections.filter(s => ids.has(s.id)).length, 0); }
-function pctOf(book) { return book.sectionCount ? Math.round(doneCount(book) / book.sectionCount * 100) : 0; }
-
-function ringSvg(size, p) {
-  const r = (size - 6) / 2, c = 2 * Math.PI * r;
-  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">' +
-    '<circle class="track" cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke-width="2.4"/>' +
-    '<circle class="val" cx="' + size / 2 + '" cy="' + size / 2 + '" r="' + r + '" fill="none" stroke-width="2.4" stroke-dasharray="' + c + '" stroke-dashoffset="' + (c - c * p / 100) + '"/>' +
-    '</svg>';
-}
-
-let drag = null;
-
-function render() {
-  document.querySelectorAll(".cell").forEach(n => n.remove());
-  const base = basePositions();
-  const { cw } = metrics();
-  DATA.cells.forEach((cell, i) => {
-    const el = document.createElement("article");
-    el.className = "cell";
-    el.dataset.id = cell.id;
-    el.tabIndex = 0;
-    el.setAttribute("role", "button");
-    el.setAttribute("aria-label", "打开《" + cell.title + "》");
-    el.style.width = cw + "px";
-    el.style.animation = "rise .7s cubic-bezier(.22,.61,.36,1) " + (i * 90) + "ms both";
-    const p = pctOf(cell);
-    el.innerHTML =
-      '<div class="cell-kind"><span class="badge">书</span><span class="ring">' + ringSvg(46, p) + '<b>' + p + '%</b></span></div>' +
-      '<h3>' + esc(cell.title) + '</h3>' +
-      '<p class="author">' + esc(cell.author) + '</p>' +
-      '<div class="cell-foot"><span>' + (cell.chapters.length ? cell.chapters.length + " 章 · " + cell.sectionCount + " 节" : "目录待生成") + '</span>' +
-      '<span class="open-hint">点开 →</span></div>';
-    stage.appendChild(el);
-    const clearAnim = () => { el.style.animation = "none"; };
-    el.addEventListener("animationend", clearAnim, { once: true });
-    setTimeout(clearAnim, 1500 + i * 90);
-    if (!narrow()) {
-      const q = state.positions[cell.id] || base[cell.id];
-      el.style.left = q.x + "px";
-      el.style.top = q.y + "px";
-    }
-    bindCell(el, cell);
+const PRESET_LINKS = [];
+(function seedLinks() {
+  const byAuthor = {};
+  DATA.books.forEach(b => { (byAuthor[b.author] = byAuthor[b.author] || []).push(b.id); });
+  Object.values(byAuthor).forEach(ids => {
+    for (let i = 0; i < ids.length - 1; i++) PRESET_LINKS.push({ a: ids[i], b: ids[i + 1], why: "同一作者" });
   });
-  document.getElementById("stat-books").textContent = DATA.cells.length;
-  document.getElementById("stat-cards").textContent = DATA.cells.reduce((n, c) => n + c.cards.length, 0);
-  document.getElementById("stat-inspo").textContent = DATA.cells.reduce((n, c) => n + c.inspirations.length, 0);
-  document.getElementById("stat-chapters").textContent = DATA.cells.reduce((n, c) => n + c.chapters.length, 0);
-  if (state.moved || Object.keys(state.positions).length) { resetBtn.hidden = false; hint.classList.add("gone"); }
-  requestAnimationFrame(drawArcs);
+})();
+
+const LINK_KEY = "palace-scene-links";
+let localLinks = [];
+try { localLinks = JSON.parse(localStorage.getItem(LINK_KEY) || "[]"); } catch (e) {}
+
+function allLinks() { return PRESET_LINKS.concat(localLinks); }
+function saveLinks() { try { localStorage.setItem(LINK_KEY, JSON.stringify(localLinks)); } catch (e) {} }
+
+/* ---------------- 交互状态 ---------------- */
+let hoverId = null, activeId = null, linkMode = false, linkFrom = null;
+let pointers = new Map(), dragStart = null, lastMove = 0;
+let projected = {};
+
+/* ---------------- 绘制 ---------------- */
+function fitView() {
+  view.panX = 0; view.panY = 0;
+  if (innerWidth >= 720) return;
+  view.dist = view.targetDist = 2400;
+  for (let i = 0; i < 30; i++) {
+    const pts = nodes.map(n => project(n.x, n.baseY, n.z));
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+    if (w <= W - 100 && h <= H - 240) break;
+    view.dist += 120; view.targetDist = view.dist;
+  }
+  const pts = nodes.map(n => project(n.x, n.baseY, n.z));
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  view.panX = Math.max(-W * 0.3, Math.min(W * 0.3, W / 2 - (Math.min(...xs) + Math.max(...xs)) / 2));
+  view.panY = Math.max(-100, Math.min(100, H * 0.5 - (Math.min(...ys) + Math.max(...ys)) / 2));
 }
 
-function bindCell(el, cell) {
-  el.addEventListener("pointerdown", e => {
-    if (narrow() || e.button !== 0) return;
-    const r = el.getBoundingClientRect(), s = stage.getBoundingClientRect();
-    drag = {
-      el, cell, id: cell.id, pointerId: e.pointerId,
-      startX: e.clientX, startY: e.clientY,
-      origX: r.left - s.left, origY: r.top - s.top,
-      w: r.width, h: r.height, moved: false,
-    };
-    try { el.setPointerCapture(e.pointerId); } catch (err) {}
-    el.classList.add("dragging");
-    el.classList.remove("tilting");
-  });
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = innerWidth; H = innerHeight;
+  view.dist = view.targetDist = fitDist();
+  view.pitch = view.targetPitch = 1.0;
+  fitView();
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+addEventListener("resize", resize);
 
-  el.addEventListener("pointermove", e => {
-    if (drag && drag.pointerId === e.pointerId) {
-      const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
-      if (!drag.moved && Math.hypot(dx, dy) > 5) drag.moved = true;
-      if (drag.moved) {
-        const x = Math.max(0, Math.min(stage.clientWidth - drag.w, drag.origX + dx));
-        const y = Math.max(0, Math.min(stage.clientHeight - drag.h, drag.origY + dy));
-        el.style.left = x + "px";
-        el.style.top = y + "px";
-        drawArcs();
+function drawBackground() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#9dbfd8");
+  g.addColorStop(0.42, "#7fa7c4");
+  g.addColorStop(1, "#6289a8");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  const vg = ctx.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.2, W / 2, H * 0.5, Math.max(W, H) * 0.78);
+  vg.addColorStop(0, "rgba(255,255,255,.10)");
+  vg.addColorStop(0.55, "rgba(255,255,255,0)");
+  vg.addColorStop(1, "rgba(16,38,54,.20)");
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawGrid() {
+  ctx.lineWidth = 1.15;
+  const seg = 22;
+  for (let axis = 0; axis < 2; axis++) {
+    for (let k = -EXT; k <= EXT; k++) {
+      const fixed = k * GRID;
+      let prev = null;
+      for (let i = 0; i <= seg; i++) {
+        const t = -EXT * GRID + (i / seg) * 2 * EXT * GRID;
+        const p = axis === 0 ? project(fixed, 0, t) : project(t, 0, fixed);
+        if (prev) {
+          const midS = (prev.s + p.s) / 2;
+          let a = 0.52 * Math.max(0.22, Math.min(1, midS * 1.55));
+          if (Math.abs(t) > (EXT - 0.5) * GRID) a *= 0.65;
+          ctx.strokeStyle = "rgba(255,255,255," + a.toFixed(3) + ")";
+          ctx.beginPath();
+          ctx.moveTo(prev.x, prev.y);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+        }
+        prev = p;
       }
+    }
+  }
+}
+
+function drawArcs(t) {
+  const links = allLinks();
+  links.forEach((ln, idx) => {
+    const A = nodes.find(n => n.book.id === ln.a), B = nodes.find(n => n.book.id === ln.b);
+    if (!A || !B) return;
+    const hot = (hoverId && (ln.a === hoverId || ln.b === hoverId)) || (activeId && (ln.a === activeId || ln.b === activeId));
+    const ay = A.baseY + Math.sin(t * 0.0011 + A.phase) * 7;
+    const by = B.baseY + Math.sin(t * 0.0011 + B.phase) * 7;
+    const mx = (A.x + B.x) / 2, mz = (A.z + B.z) / 2;
+    const dxs = B.x - A.x, dzs = B.z - A.z;
+    const arcLen = Math.hypot(dxs, dzs) || 1;
+    const nx = -dzs / arcLen, nz = dxs / arcLen;
+    const side = arcLen * 0.42 * ((ln.why === "你的联想") ? 1 : 0.85);
+    const apex = 110 + arcLen * 0.18 + (ln.why === "你的联想" ? 40 : 0);
+    const qx = mx + nx * side, qy = apex + 40, qz = mz + nz * side;
+
+    const N = 36;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, w = 1 - u;
+      const x = w * w * A.x + 2 * w * u * qx + u * u * B.x;
+      const y = w * w * ay + 2 * w * u * qy + u * u * by;
+      const z = w * w * A.z + 2 * w * u * qz + u * u * B.z;
+      pts.push(project(x, y, z));
+    }
+    ctx.save();
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    pts.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+    ctx.strokeStyle = hot ? "rgba(255,252,240,.98)" : "rgba(248,252,255,.8)";
+    ctx.lineWidth = hot ? 2.6 : 1.7;
+    ctx.shadowColor = hot ? "rgba(255,240,200,.9)" : "rgba(225,242,255,.75)";
+    ctx.shadowBlur = hot ? 18 : 12;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const prog = ((t * 0.00016) + idx * 0.27) % 1;
+    const ip = Math.min(N, Math.max(0, Math.round(prog * N)));
+    const pp = pts[ip];
+    ctx.beginPath();
+    ctx.arc(pp.x, pp.y, hot ? 3.4 : 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = hot ? "rgba(255,250,235,.98)" : "rgba(255,253,246,.85)";
+    ctx.shadowColor = "rgba(255,244,210,.95)";
+    ctx.shadowBlur = hot ? 14 : 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    if (hot) {
+      const dash = t * 0.00035 + idx * 0.2;
+      ctx.setLineDash([2, 26]);
+      ctx.lineDashOffset = -dash * 260;
+      ctx.strokeStyle = "rgba(255,255,255,.95)";
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  });
+}
+
+function drawFloorRing(n) {
+  const p = project(n.x, 0, n.z);
+  const r = n.r * 1.55;
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i <= 30; i++) {
+    const a = (i / 30) * Math.PI * 2;
+    const q = project(n.x + Math.cos(a) * r, 0, n.z + Math.sin(a) * r);
+    i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = "rgba(255,255,255,.55)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = "rgba(30,60,80,.10)";
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawOrb(n, t) {
+  const bob = Math.sin(t * 0.0011 + n.phase) * 7;
+  const y = n.baseY + bob;
+  const p = project(n.x, y, n.z);
+  const hovered = hoverId === n.book.id || activeId === n.book.id;
+  const R = n.r * p.s * (hovered ? 1.13 : 1);
+  projected[n.book.id] = { x: p.x, y: p.y, r: R, s: p.s };
+
+  drawFloorRing(n);
+
+  // 光晕
+  const glow = ctx.createRadialGradient(p.x, p.y, R * 0.2, p.x, p.y, R * 3.0);
+  glow.addColorStop(0, rgba(n.color, hovered ? 0.7 : 0.46));
+  glow.addColorStop(0.55, rgba(n.color, 0.12));
+  glow.addColorStop(1, rgba(n.color, 0));
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R * 3.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 球体
+  const g = ctx.createRadialGradient(p.x - R * 0.36, p.y - R * 0.42, R * 0.12, p.x, p.y, R * 1.04);
+  g.addColorStop(0, rgba(mix(n.color, "#fff", 0.55), 1));
+  g.addColorStop(0.45, rgba(n.color, 1));
+  g.addColorStop(0.85, rgba(mix(n.color, "#000", 0.22), 1));
+  g.addColorStop(1, rgba(mix(n.color, "#000", 0.5), 1));
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  // 球面纹理
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R - 0.6, 0, Math.PI * 2);
+  ctx.clip();
+  for (let i = 0; i < 3; i++) {
+    const off = (i - 1) * R * 0.42;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y + off, R * 1.02, R * 0.18, (i - 1) * 0.12, 0, Math.PI * 2);
+    ctx.strokeStyle = rgba(mix(n.color, i % 2 ? "#fff" : "#000", 0.12), 0.5);
+    ctx.lineWidth = R * 0.12;
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 高光
+  ctx.beginPath();
+  ctx.arc(p.x - R * 0.34, p.y - R * 0.4, R * 0.26, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,.45)";
+  ctx.fill();
+
+  // 名称
+  const floor = project(n.x, 0, n.z);
+  const fs = Math.max(14, 19 * p.s);
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.shadowColor = "rgba(255,255,255,.55)";
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = hovered ? "rgba(10,26,34,.98)" : "rgba(16,32,42,.82)";
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "1.5px";
+  ctx.font = "600 " + fs + "px 'Songti SC','Noto Serif SC',serif";
+  ctx.fillText(n.book.title, floor.x, floor.y + 14 * p.s);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(20,38,48,.55)";
+  if ("letterSpacing" in ctx) ctx.letterSpacing = "0.6px";
+  ctx.font = Math.max(10, fs * 0.68) + "px 'Songti SC','Noto Serif SC',serif";
+  ctx.fillText(n.book.author, floor.x, floor.y + 14 * p.s + fs * 1.32);
+  ctx.restore();
+}
+
+function render(t) {
+  ctx.clearRect(0, 0, W, H);
+  drawBackground();
+  drawGrid();
+  drawArcs(t);
+  const order = nodes.map(n => ({ n, d: project(n.x, n.baseY, n.z).d })).sort((a, b) => b.d - a.d);
+  order.forEach(o => drawOrb(o.n, t));
+  requestAnimationFrame(render);
+}
+
+/* ---------------- 交互 ---------------- */
+function hitTest(x, y) {
+  let best = null, bestD = Infinity;
+  Object.keys(projected).forEach(id => {
+    const p = projected[id];
+    const d = Math.hypot(x - p.x, y - p.y);
+    if (d < Math.max(34, p.r * 1.6) && d < bestD) { best = id; bestD = d; }
+  });
+  return best;
+}
+
+canvas.addEventListener("pointerdown", e => {
+  try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  dragStart = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch, dist: view.targetDist, moved: 0 };
+  view.spin = false;
+  setSpinBtn(false);
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    dragStart.pinch = Math.hypot(a.x - b.x, a.y - b.y);
+    dragStart.pinchDist = view.targetDist;
+  }
+});
+
+canvas.addEventListener("pointermove", e => {
+  const pt = pointers.get(e.pointerId);
+  if (pt) {
+    pt.x = e.clientX; pt.y = e.clientY;
+    if (pointers.size === 2 && dragStart && dragStart.pinch) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      view.targetDist = Math.max(1050, Math.min(3600, dragStart.pinchDist * dragStart.pinch / Math.max(d, 1)));
       return;
     }
-    if (narrow()) return;
-    const r = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
-    el.style.setProperty("--mx", (px * 100).toFixed(1) + "%");
-    el.style.setProperty("--my", (py * 100).toFixed(1) + "%");
-    el.style.setProperty("--ry", ((px - .5) * 7).toFixed(2) + "deg");
-    el.style.setProperty("--rx", ((.5 - py) * 7).toFixed(2) + "deg");
-    el.classList.add("tilting");
-  });
-
-  el.addEventListener("pointerenter", () => { if (!narrow()) el.classList.add("tilting"); });
-  el.addEventListener("pointerleave", () => { el.classList.remove("tilting"); });
-
-  const finish = e => {
-    if (!drag || drag.pointerId !== e.pointerId) return;
-    const d = drag; drag = null;
-    el.classList.remove("dragging");
-    try { el.releasePointerCapture(e.pointerId); } catch (err) {}
-    if (d.moved) {
-      const x = Math.max(0, Math.min(stage.clientWidth - d.w, d.origX + (e.clientX - d.startX)));
-      const y = Math.max(0, Math.min(stage.clientHeight - d.h, d.origY + (e.clientY - d.startY)));
-      el.style.left = x + "px"; el.style.top = y + "px";
-      state.positions[d.id] = { x, y };
-      state.moved = true;
-      save();
-      resetBtn.hidden = false;
-      hint.classList.add("gone");
+    if (dragStart) {
+      const dx = e.clientX - dragStart.x, dy = e.clientY - dragStart.y;
+      dragStart.moved = Math.max(dragStart.moved, Math.hypot(dx, dy));
+      view.yaw = dragStart.yaw + dx * 0.0055;
+      view.pitch = Math.max(0.5, Math.min(1.28, dragStart.pitch - dy * 0.0022));
+      if (dragStart.moved > 4) canvas.classList.add("dragging");
     }
-    drawArcs();
-  };
-  el.addEventListener("pointerup", e => {
-    const wasMoved = drag && drag.moved;
-    finish(e);
-    if (!wasMoved) openBook(cell.id);
-  });
-  el.addEventListener("pointercancel", finish);
-  el.addEventListener("keydown", e => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openBook(cell.id); }
-  });
+    return;
+  }
+  const id = hitTest(e.clientX, e.clientY);
+  canvas.style.cursor = id ? "pointer" : (linkMode ? "crosshair" : "grab");
+  setHover(id, e.clientX, e.clientY);
+});
+
+canvas.addEventListener("pointerup", e => {
+  pointers.delete(e.pointerId);
+  canvas.classList.remove("dragging");
+  if (dragStart && dragStart.moved < 6) {
+    const id = hitTest(e.clientX, e.clientY);
+    if (id) handleNodeClick(id);
+    else if (panel.classList.contains("open")) closePanel();
+  }
+  dragStart = null;
+});
+
+canvas.addEventListener("pointercancel", () => { pointers.clear(); dragStart = null; canvas.classList.remove("dragging"); });
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  view.targetDist = Math.max(1050, Math.min(3600, view.targetDist * Math.exp(e.deltaY * 0.0012)));
+}, { passive: false });
+
+canvas.addEventListener("pointerleave", () => setHover(null));
+
+function setHover(id, x, y) {
+  if (hoverId === id) { if (id) placeTip(x, y); return; }
+  hoverId = id;
+  if (!id) { tip.classList.remove("show"); return; }
+  const n = nodes.find(n => n.book.id === id);
+  const b = n.book;
+  tip.innerHTML = "<b>" + esc(b.title) + "</b><br>" + esc(b.author) + (b.sectionCount ? " · " + b.sectionCount + " 节" : "");
+  placeTip(x, y);
+  tip.classList.add("show");
 }
 
-function drawArcs() {
-  if (narrow()) { arcSvg.innerHTML = ""; return; }
-  const els = [...document.querySelectorAll(".cell")];
-  if (els.length < 2) { arcSvg.innerHTML = ""; return; }
-  const sr = stage.getBoundingClientRect();
-  const rects = els.map(el => el.getBoundingClientRect());
-  let out = "";
-  for (let i = 0; i < rects.length; i++) {
-    for (let j = i + 1; j < rects.length; j++) {
-      const a = rects[i], b = rects[j];
-      const ax = a.left + a.width / 2 - sr.left, ay = a.top + a.height / 2 - sr.top;
-      const bx = b.left + b.width / 2 - sr.left, by = b.top + b.height / 2 - sr.top;
-      const dist = Math.hypot(bx - ax, by - ay);
-      if (dist > 640) continue;
-      const op = Math.max(0.18, Math.min(0.95, (640 - dist) / 260));
-      const mx = (ax + bx) / 2, my = (ay + by) / 2;
-      const nx = -(by - ay) / Math.max(dist, 1), ny = (bx - ax) / Math.max(dist, 1);
-      const sag = Math.min(70, dist * 0.16) + 10;
-      const d = "M " + ax + " " + ay + " Q " + (mx + nx * sag) + " " + (my + ny * sag) + " " + bx + " " + by;
-      out += '<path class="arc-halo" d="' + d + '" style="opacity:' + (0.3 * op) + '"/>';
-      out += '<path class="arc" d="' + d + '" style="opacity:' + op + '"/>';
+function placeTip(x, y) { tip.style.left = x + "px"; tip.style.top = y + "px"; }
+
+function handleNodeClick(id) {
+  if (linkMode) {
+    if (!linkFrom) {
+      linkFrom = id;
+      activeId = id;
+      showToast("再点一颗星，连成联想");
+      return;
     }
+    if (linkFrom === id) { linkFrom = null; activeId = null; return; }
+    const exists = allLinks().some(l => (l.a === linkFrom && l.b === id) || (l.a === id && l.b === linkFrom));
+    if (!exists) {
+      localLinks.push({ a: linkFrom, b: id, why: "你的联想" });
+      saveLinks();
+      showToast("连上了");
+    } else {
+      showToast("这两颗星已经连着");
+    }
+    linkFrom = null;
+    activeId = null;
+    setLinkMode(false);
+    return;
   }
-  arcSvg.innerHTML = out;
+  activeId = id;
+  openPanel(id);
 }
 
-/* ---------- 阅读层 ---------- */
-let lastFocus = null, closing = false;
-
-function layoutPanel() {
-  const vw = innerWidth, vh = innerHeight;
-  if (narrow()) {
-    panel.style.cssText += "width:" + vw + "px;height:" + vh + "px;left:0;top:0;";
-    return { left: 0, top: 0, w: vw, h: vh };
-  }
-  const w = Math.min(1000, vw - 40), h = Math.min(700, vh - 48);
-  const left = (vw - w) / 2, top = (vh - h) / 2;
-  panel.style.cssText += "width:" + w + "px;height:" + h + "px;left:" + left + "px;top:" + top + "px;";
-  return { left, top, w, h };
-}
-
-function openBook(id) {
-  const cell = DATA.cells.find(c => c.id === id);
-  if (!cell || closing) return;
-  lastFocus = document.activeElement;
-  const cellEl = document.querySelector('.cell[data-id="' + id + '"]');
-  const startRect = cellEl ? cellEl.getBoundingClientRect() : null;
-  panel.innerHTML = panelHtml(cell);
-  panel.dataset.book = id;
-  reader.classList.add("open");
-  reader.setAttribute("aria-hidden", "false");
-  document.body.style.overflow = "hidden";
-  const box = layoutPanel();
-  panel.classList.add("show");
-  if (startRect && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    const dx = startRect.left - box.left, dy = startRect.top - box.top;
-    const sx = startRect.width / box.w, sy = startRect.height / box.h;
-    panel.animate(
-      [{ transform: "translate(" + dx + "px," + dy + "px) scale(" + sx + "," + sy + ")", opacity: .35, borderRadius: "16px" },
-       { transform: "none", opacity: 1, borderRadius: "22px" }],
-      { duration: 420, easing: "cubic-bezier(.22,.61,.36,1)" }
-    );
-  }
-  bindPanel(cell);
-  const closeBtn = panel.querySelector(".close");
-  if (closeBtn) closeBtn.focus({ preventScroll: true });
-}
-
-function closeBook() {
-  if (!reader.classList.contains("open") || closing) return;
-  closing = true;
-  const cellEl = document.querySelector('.cell[data-id="' + (panel.dataset.book || "") + '"]');
-  const endRect = cellEl ? cellEl.getBoundingClientRect() : null;
-  const pRect = panel.getBoundingClientRect();
-  reader.classList.add("closing");
-  const finish = () => {
-    closing = false;
-    reader.classList.remove("open", "closing");
-    reader.setAttribute("aria-hidden", "true");
-    panel.innerHTML = "";
-    panel.style.cssText = "";
-    document.body.style.overflow = "";
-    if (lastFocus && lastFocus.focus) setTimeout(() => lastFocus.focus({ preventScroll: true }), 20);
-  };
-  if (endRect && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    const dx = endRect.left - pRect.left, dy = endRect.top - pRect.top;
-    const sx = endRect.width / pRect.width, sy = endRect.height / pRect.height;
-    const anim = panel.animate(
-      [{ transform: "none", opacity: 1 }, { transform: "translate(" + dx + "px," + dy + "px) scale(" + sx + "," + sy + ")", opacity: 0 }],
-      { duration: 240, easing: "cubic-bezier(.4,0,.6,1)" }
-    );
-    anim.onfinish = finish;
-    anim.oncancel = finish;
-  } else {
-    setTimeout(finish, 0);
-  }
-}
-
-function panelHtml(cell) {
-  const p = pctOf(cell);
-  const year = cell.year ? " · " + cell.year : "";
-  return '' +
-    '<div class="panel-head">' +
-      '<div><span class="badge">书</span><h2>' + esc(cell.title) + '</h2>' +
-      '<p class="byline">' + esc(cell.author) + ' · ' + esc(cell.publisher) + year + '</p></div>' +
-      '<button class="close" aria-label="关闭">×</button>' +
+function openPanel(id) {
+  const n = nodes.find(n => n.book.id === id);
+  if (!n) return;
+  const b = n.book;
+  document.getElementById("p-title").textContent = b.title;
+  document.getElementById("p-by").textContent = [b.author, b.publisher, b.year].filter(Boolean).join(" · ");
+  const related = allLinks().filter(l => l.a === id || l.b === id).map(l => {
+    const other = l.a === id ? l.b : l.a;
+    const ob = DATA.books.find(x => x.id === other);
+    return { title: ob ? ob.title : "", why: l.why, color: ob ? ob.color : "#888" };
+  });
+  const chs = b.chapters.map((c, i) => '<div class="chapter"><span class="n">' + String(i + 1).padStart(2, "0") + '</span><span>' + esc(c.title) + '</span></div>').join("");
+  document.getElementById("panelBody").innerHTML =
+    '<div class="facts">' +
+      '<div class="fact"><b>' + (b.chapters.length || "—") + '</b><span>章</span></div>' +
+      '<div class="fact"><b>' + b.sectionCount + '</b><span>节</span></div>' +
+      '<div class="fact"><b>' + b.cards.length + '</b><span>卡片</span></div>' +
     '</div>' +
-    '<div class="panel-body">' +
-      '<aside class="aside">' +
-        '<div class="big-ring">' + ringSvg(128, p) + '<b data-pct>' + p + '%</b></div>' +
-        '<div class="meta">' +
-          '<div><span>目录</span><b>' + cell.chapters.length + ' 章 / ' + cell.sectionCount + ' 节</b></div>' +
-          '<div><span>已读</span><b data-done>' + doneCount(cell) + ' 节</b></div>' +
-          '<div><span>卡片</span><b>' + cell.cards.length + ' 张</b></div>' +
-          '<div><span>灵感</span><b>' + cell.inspirations.length + ' 条</b></div>' +
-        '</div>' +
-        '<p class="note">这一页只放目录和我自己的笔记，原文不在这里。<br>点章节可以标记「读过」，进度留在本机。</p>' +
-      '</aside>' +
-      '<main>' +
-        '<div class="tabs" role="tablist">' +
-          '<button class="tab active" data-tab="chapters" role="tab">目录</button>' +
-          '<button class="tab" data-tab="cards" role="tab">卡片</button>' +
-          '<button class="tab" data-tab="inspirations" role="tab">灵感</button>' +
-        '</div>' +
-        '<div class="tab-body" data-body>' + chaptersHtml(cell) + '</div>' +
-      '</main>' +
-    '</div>';
-}
-
-function chaptersHtml(cell) {
-  if (!cell.chapters.length) {
-    return '<div class="empty"><p>目录还没生成</p><p class="muted">翻开这本书之后，章节会自动出现在这里。</p></div>';
-  }
-  const ids = doneSet(cell);
-  return cell.chapters.map((ch, i) => {
-    const done = ch.sections.length > 0 && ch.sections.every(s => ids.has(s.id));
-    return '<button class="ch ' + (done ? "done" : "") + '" data-sections="' + ch.sections.map(s => s.id).join(",") + '">' +
-      '<span class="idx">' + String(i + 1).padStart(2, "0") + '</span>' +
-      '<span class="title">' + esc(ch.title) + '</span>' +
-      '<span class="state">' + (done ? "已读" : "未读") + '</span></button>';
-  }).join("");
-}
-
-function cardsHtml(cell) {
-  if (!cell.cards.length) return '<div class="empty"><p>这一本还没有卡片</p><p class="muted">划线、写下的批注会变成卡片，落在这里。</p></div>';
-  return cell.cards.map(c => {
-    const label = { excerpt: "摘录", thought: "想法", mistake: "错题" }[c.type] || "卡片";
-    return '<div class="card"><span class="tag">' + label + '</span>' +
-      (c.quote ? '<blockquote>' + esc(c.quote) + '</blockquote>' : '') +
-      (c.note ? '<p class="muted">' + esc(c.note) + '</p>' : '') + '</div>';
-  }).join("");
-}
-
-function inspoHtml(cell) {
-  if (!cell.inspirations.length) return '<div class="empty"><p>还没有灵感</p><p class="muted">聊出来的那一点火花，会留在这里。</p></div>';
-  return cell.inspirations.map(i => '<div class="card"><span class="tag">灵感</span><h4>' + esc(i.title || '') + '</h4><p class="muted">' + esc(i.body || '') + '</p></div>').join("");
-}
-
-function bindPanel(cell) {
-  panel.querySelector(".close").addEventListener("click", closeBook);
-  panel.querySelectorAll(".tab").forEach(tab => {
-    tab.addEventListener("click", () => {
-      panel.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
-      const body = panel.querySelector("[data-body]");
-      const kind = tab.dataset.tab;
-      body.innerHTML = kind === "cards" ? cardsHtml(cell) : kind === "inspirations" ? inspoHtml(cell) : chaptersHtml(cell);
-      if (kind === "chapters") bindChapters(cell);
-    });
+    '<h3>目录</h3>' +
+    (chs || '<p class="muted">目录还没生成。翻开这本书之后，章节会出现在这里。</p>') +
+    '<h3>联想</h3>' +
+    (related.length ? '<div class="links">' + related.map(r => '<div class="linkrow"><i style="background:' + r.color + '"></i><span>' + esc(r.title) + '</span><span class="muted">' + esc(r.why) + '</span></div>').join("") + '</div>' : '<p class="muted">还没有连接。点右上角「连一条联想」，再点两颗星。</p>') +
+    (localLinks.length ? '<button class="clearlinks" id="clearLinks">清除我连的线</button>' : '') +
+    '<p class="panel-foot">' + esc(b.publisher) + ' · 进度会随阅读记录更新</p>';
+  view.spin = false;
+  setSpinBtn(false);
+  panel.classList.add("open");
+  panel.setAttribute("aria-hidden", "false");
+  const clr = document.getElementById("clearLinks");
+  if (clr) clr.addEventListener("click", () => {
+    localLinks = []; saveLinks(); showToast("已清除"); openPanel(id);
   });
-  bindChapters(cell);
+  document.getElementById("hintbar").classList.add("hidden");
 }
 
-function bindChapters(cell) {
-  panel.querySelectorAll(".ch").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const ids = doneSet(cell);
-      const secs = (btn.dataset.sections || "").split(",").filter(Boolean);
-      const nowDone = !secs.every(s => ids.has(s));
-      secs.forEach(s => nowDone ? ids.add(s) : ids.delete(s));
-      state.done[cell.id] = [...ids];
-      save();
-      btn.classList.toggle("done", nowDone);
-      btn.querySelector(".state").textContent = nowDone ? "已读" : "未读";
-      updateProgress(cell);
-    });
-  });
+function closePanel() {
+  panel.classList.remove("open");
+  panel.setAttribute("aria-hidden", "true");
+  activeId = null;
+  document.getElementById("hintbar").classList.remove("hidden");
 }
 
-function updateProgress(cell) {
-  const p = pctOf(cell);
-  const c128 = 2 * Math.PI * ((128 - 6) / 2);
-  const big = panel.querySelector(".big-ring");
-  if (big) {
-    big.querySelector(".val").setAttribute("stroke-dashoffset", String(c128 - c128 * p / 100));
-    big.querySelector("[data-pct]").textContent = p + "%";
-  }
-  const doneEl = panel.querySelector("[data-done]");
-  if (doneEl) doneEl.textContent = doneCount(cell) + " 节";
-  const cellEl = document.querySelector('.cell[data-id="' + cell.id + '"]');
-  if (cellEl) {
-    const c46 = 2 * Math.PI * ((46 - 6) / 2);
-    cellEl.querySelector(".ring .val").setAttribute("stroke-dashoffset", String(c46 - c46 * p / 100));
-    cellEl.querySelector(".ring b").textContent = p + "%";
-  }
-}
+document.getElementById("panelClose").addEventListener("click", closePanel);
+addEventListener("keydown", e => { if (e.key === "Escape") closePanel(); });
 
-/* ---------- 全局 ---------- */
-document.getElementById("copy-btn").addEventListener("click", async e => {
-  const btn = e.currentTarget;
-  try { await navigator.clipboard.writeText(location.href); btn.textContent = "已复制"; }
-  catch (err) { window.prompt("复制这个链接：", location.href); }
-  setTimeout(() => btn.textContent = "复制这个页面的链接", 1800);
+/* ---------------- 按钮 ---------------- */
+const spinBtn = document.getElementById("spinBtn");
+const linkBtn = document.getElementById("linkBtn");
+function setSpinBtn(on) { spinBtn.classList.toggle("on", on); spinBtn.textContent = on ? "自动旋转" : "已暂停"; }
+spinBtn.addEventListener("click", () => { view.spin = !view.spin; setSpinBtn(view.spin); });
+
+function setLinkMode(on) {
+  linkMode = on;
+  linkBtn.classList.toggle("on", on);
+  linkBtn.textContent = on ? "选两颗星" : "连一条联想";
+  canvas.classList.toggle("linkmode", on);
+  if (!on) { linkFrom = null; }
+}
+linkBtn.addEventListener("click", () => setLinkMode(!linkMode));
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  view.targetDist = fitDist(); view.dist = fitDist();
+  view.pitch = 1.0; view.targetPitch = 1.0;
+  view.yaw = 0.42;
+  view.spin = true; setSpinBtn(true);
+  closePanel();
+  setLinkMode(false);
 });
 
-resetBtn.addEventListener("click", () => {
-  state.positions = {}; state.moved = false; save();
-  const base = basePositions();
-  document.querySelectorAll(".cell").forEach(el => {
-    const q = base[el.dataset.id];
-    el.style.transition = "left .4s cubic-bezier(.22,.61,.36,1), top .4s cubic-bezier(.22,.61,.36,1)";
-    el.style.left = q.x + "px";
-    el.style.top = q.y + "px";
-    setTimeout(() => { el.style.transition = ""; }, 460);
-  });
-  resetBtn.hidden = true;
-  setTimeout(drawArcs, 20);
-});
+let toastTimer = null;
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
+}
 
-scrim.addEventListener("click", closeBook);
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeBook(); });
+function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 
-let resizeTimer = null;
-window.addEventListener("resize", () => {
-  clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => {
-    const base = basePositions();
-    const { cw } = metrics();
-    document.querySelectorAll(".cell").forEach(el => {
-      el.style.width = cw + "px";
-      if (narrow()) { el.style.left = ""; el.style.top = ""; }
-      else if (!state.positions[el.dataset.id]) {
-        const q = base[el.dataset.id];
-        el.style.left = q.x + "px";
-        el.style.top = q.y + "px";
-      }
-    });
-    drawArcs();
-  }, 120);
-});
+/* ---------------- 主循环 ---------------- */
+let lastTick = null;
+function tick(t) {
+  const dt = lastTick == null ? 16 : Math.min(64, t - lastTick);
+  lastTick = t;
+  if (view.spin) view.yaw += dt * 0.000055;
+  view.pitch += (view.targetPitch - view.pitch) * 0.08;
+  view.dist += (view.targetDist - view.dist) * 0.10;
+  requestAnimationFrame(tick);
+}
 
-if (narrow()) hint.textContent = "点一下，翻开一本书";
-render();
+resize();
+requestAnimationFrame(render);
+requestAnimationFrame(tick);
+setTimeout(() => hintbar.classList.add("hidden"), 9000);
 </script>
 </body>
 </html>
